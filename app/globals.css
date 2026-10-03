@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-brand: #1433bd;
+  --color-brand-dark: #0d2486;
+  --color-accent: #19dce3;
+  --color-accent-soft: #d6f8f9;
+  --color-ink: #0b0b14;
+  --color-muted: #4a4f5c;
+  --color-line: #d9dce3;
+  --color-surface: #f5f7fb;
+  --color-danger: #a4161a;
+  --color-danger-soft: #fdecec;
+  --color-warn: #7a4b00;
+  --color-warn-soft: #fff4dc;
+  --color-ok: #1e6b3a;
+  --color-ok-soft: #e6f4ea;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  color: var(--color-ink);
+  background: #ffffff;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  border-radius: 4px;
+}
+header :where(a, button, select):focus-visible {
+  outline-color: #ffffff;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
