@@ -1,13 +1,13 @@
-import { diffFields, pickFields, sameFieldValue } from '@/lib/activity-fields';
+import { FIELD_KEYS, fieldsEqualStrict, pickFields, sameFieldValue } from '@/lib/activity-fields';
 import { formatFieldValue } from '@/lib/activities/format';
 import { createActivity, getActivitySnapshot } from '@/lib/activities/service';
 import { isIsoDate } from '@/lib/dates';
 import { prisma } from '@/lib/db';
 import { loadMembers } from '@/lib/members';
 import { normalizeName } from '@/lib/text';
-import { FRONTS, type ActivityFields, type ActivityStatus, type CellValue, type MemberInfo, type Sheet, type SourceMeta, type SourceMetaJson, type SpreadsheetDoc } from '@/lib/types';
+import { FRONTS, type ActivityFields, type ActivityStatus, type CellValue, type MemberInfo, type ProposedSuggestion, type Sheet, type SourceMeta, type SourceMetaJson, type SpreadsheetDoc } from '@/lib/types';
 import { getSyncState } from './sources';
-import { saveDiscarded, saveSuggestion } from './suggestions';
+import { saveDiscarded, saveSuggestion, supersedePendingForTarget } from './suggestions';
 
 const COLUMN_ALIASES: Record<string, string[]> = {
   id: ['id'],
@@ -38,6 +38,8 @@ export interface RegistryRow {
   origin: string | null;
   cellRefs: Record<string, string>; // chave = coluna lógica (id, title, owners, dueDate...)
   issues: string[];
+  /** Campos cuja célula não foi interpretada: nunca viram proposta (evita limpar valores oficiais por erro de leitura). */
+  unparsed: (keyof ActivityFields)[];
 }
 
 const text = (v: CellValue): string | null => {
@@ -73,25 +75,39 @@ export function parseRegistryRows(sheet: Sheet, members: MemberInfo[]): { rows: 
     }
     const id = rawId.toUpperCase();
     const rowIssues: string[] = [];
+    const unparsed = new Set<keyof ActivityFields>();
 
     const ownerIds: string[] = [];
     for (const name of (text(get('owners')) ?? '').split(/;|,|\s+e\s+/).map((s) => s.trim()).filter(Boolean)) {
       const m = members.find((x) => normalizeName(x.displayName) === normalizeName(name));
       if (m) ownerIds.push(m.id);
-      else rowIssues.push(`${id}: responsável "${name}" não reconhecido — a confirmar`);
+      else {
+        rowIssues.push(`${id}: responsável "${name}" não reconhecido — a confirmar`);
+        unparsed.add('ownerIds');
+      }
     }
     const statusText = text(get('status'));
     let status: ActivityStatus = 'todo';
     if (statusText) {
       const mapped = STATUS_MAP[normalizeName(statusText)];
       if (mapped) status = mapped;
-      else rowIssues.push(`${id}: estado "${statusText}" não reconhecido — considerado "A fazer"`);
+      else {
+        rowIssues.push(`${id}: estado "${statusText}" não reconhecido — considerado "A fazer"`);
+        unparsed.add('status');
+        unparsed.add('blockedReason');
+      }
     }
     const due = parseDue(get('dueDate'));
-    if (due.issue) rowIssues.push(`${id}: ${due.issue}`);
+    if (due.issue) {
+      rowIssues.push(`${id}: ${due.issue}`);
+      unparsed.add('dueDate');
+    }
     const frontText = text(get('front'));
     const front = frontText ? FRONTS.find((f) => normalizeName(f) === normalizeName(frontText)) ?? null : null;
-    if (frontText && !front) rowIssues.push(`${id}: frente "${frontText}" não reconhecida`);
+    if (frontText && !front) {
+      rowIssues.push(`${id}: frente "${frontText}" não reconhecida`);
+      unparsed.add('front');
+    }
     const notes = text(get('notes'));
 
     const cellRefs: Record<string, string> = {};
@@ -103,6 +119,7 @@ export function parseRegistryRows(sheet: Sheet, members: MemberInfo[]): { rows: 
       origin: text(get('origin')),
       cellRefs,
       issues: rowIssues,
+      unparsed: [...unparsed],
       fields: {
         title: text(get('title')) ?? id,
         description: text(get('description')),
@@ -127,42 +144,54 @@ export function cellEvidence(sheetName: string, row: RegistryRow, keys: (keyof A
     .join('; ');
 }
 
-async function diffRegistry(meta: SourceMeta, sheetName: string, rows: RegistryRow[], previous: Record<string, ActivityFields>, members: MemberInfo[]): Promise<number> {
+const SUPERSEDE_NOTE = 'Planilha vigente foi editada novamente; sugestão substituída pela versão mais recente';
+
+/**
+ * `baseline` = linhas da importação inicial (nunca atualizada). Uma linha só vira proposta onde difere do baseline
+ * e do oficial; assim edições sucessivas da planilha não acumulam sugestões e voltar ao valor oficial limpa a pendência.
+ */
+async function diffRegistry(meta: SourceMeta, sheetName: string, rows: RegistryRow[], baseline: Record<string, ActivityFields>, members: MemberInfo[]): Promise<number> {
   let created = 0;
   for (const row of rows) {
-    const before = previous[row.id];
+    const before = baseline[row.id];
     const official = await getActivitySnapshot(row.id);
     if (!before && !official) {
-      const ok = await saveSuggestion(
-        {
-          kind: 'create', targetActivityId: null, proposedId: row.id, proposedFields: row.fields,
-          evidence: `${sheetName}!${row.cellRefs.id ?? `A${row.rowNumber}`}: ${row.id} — ${row.fields.title}`,
-          evidenceLocator: `${sheetName}, linha ${row.rowNumber}`,
-          reason: 'Nova linha na planilha vigente depois da importação inicial', uncertainties: row.issues, front: row.fields.front,
-        },
-        meta,
-      );
-      if (ok) created++;
+      const proposal: ProposedSuggestion = {
+        kind: 'create', targetActivityId: null, proposedId: row.id, proposedFields: row.fields,
+        evidence: `${sheetName}!${row.cellRefs.id ?? `A${row.rowNumber}`}: ${row.id} — ${row.fields.title}`,
+        evidenceLocator: `${sheetName}, linha ${row.rowNumber}`,
+        reason: 'Nova linha na planilha vigente depois da importação inicial', uncertainties: row.issues, front: row.fields.front,
+      };
+      await supersedePendingForTarget(meta.fileId, 'create', row.id, proposal.proposedFields as Record<string, unknown>, SUPERSEDE_NOTE);
+      if (await saveSuggestion(proposal, meta, { versionless: true })) created++;
       continue;
     }
     if (!before || !official) continue;
-    const keys = diffFields(before, row.fields).filter((k) => !sameFieldValue(k, row.fields[k], official[k]));
-    if (keys.length === 0) continue;
+    const keys = FIELD_KEYS.filter(
+      (k) => !row.unparsed.includes(k) && !fieldsEqualStrict(k, before[k], row.fields[k]) && !sameFieldValue(k, row.fields[k], official[k]),
+    );
+    if (keys.length === 0) {
+      await supersedePendingForTarget(meta.fileId, 'update', row.id, null, SUPERSEDE_NOTE);
+      continue;
+    }
+    const proposedFields = pickFields(row.fields, keys);
+    await supersedePendingForTarget(meta.fileId, 'update', row.id, proposedFields as Record<string, unknown>, SUPERSEDE_NOTE);
     const ok = await saveSuggestion(
       {
-        kind: 'update', targetActivityId: row.id, proposedFields: pickFields(row.fields, keys),
+        kind: 'update', targetActivityId: row.id, proposedFields,
         evidence: cellEvidence(sheetName, row, keys, members), evidenceLocator: `${sheetName}, linha ${row.rowNumber}`,
         reason: 'A planilha vigente foi editada no Drive depois da importação', uncertainties: row.issues, front: official.front,
       },
       meta,
+      { versionless: true },
     );
     if (ok) created++;
   }
-  const removed = Object.keys(previous).filter((id) => !rows.some((r) => r.id === id));
+  const removed = Object.keys(baseline).filter((id) => !rows.some((r) => r.id === id));
   await saveDiscarded(
     meta.fileId,
     meta.versionOrHash,
-    removed.map((id) => ({ excerpt: `${id} — ${previous[id].title}`, reason: 'Linha removida da planilha vigente; a atividade oficial foi mantida (remover exige decisão na aplicação)' })),
+    removed.map((id) => ({ excerpt: `${id} — ${baseline[id].title}`, reason: 'Linha removida da planilha vigente; a atividade oficial foi mantida (remover exige decisão na aplicação)' })),
   );
   return created;
 }
@@ -185,13 +214,14 @@ export async function handleRegistry(meta: SourceMeta, doc: SpreadsheetDoc, shee
       });
     }
     await prisma.syncState.update({ where: { id: 1 }, data: { initialImportAt: new Date(), authorityFileId: meta.fileId, authoritySheet: sheetName } });
+    // Baseline da importação inicial: nunca é atualizada pelas versões seguintes.
+    metaJson.registryRows = Object.fromEntries(rows.map((r) => [r.id, r.fields]));
+    metaJson.registryOrigins = Object.fromEntries(rows.filter((r) => r.origin).map((r) => [r.id, r.origin!]));
   } else {
     created = await diffRegistry(meta, sheetName, rows, metaJson.registryRows ?? {}, members);
   }
 
   await saveDiscarded(meta.fileId, meta.versionOrHash, issues.map((i) => ({ excerpt: i, reason: 'Dado incompleto ou não reconhecido na planilha vigente' })));
   metaJson.registrySheet = sheetName;
-  metaJson.registryRows = Object.fromEntries(rows.map((r) => [r.id, r.fields]));
-  metaJson.registryOrigins = Object.fromEntries(rows.filter((r) => r.origin).map((r) => [r.id, r.origin!]));
   return created;
 }

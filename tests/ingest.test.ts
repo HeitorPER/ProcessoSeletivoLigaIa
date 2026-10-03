@@ -187,3 +187,117 @@ describe('formatos e indisponibilidade', () => {
     expect(await markSourceUnavailable('GUIA_INICIAL.md', 'Arquivo removido')).toBe(false);
   });
 });
+
+type Sheet0 = ReturnType<typeof parseXlsx>['sheets'][number];
+function registryV(version: string, edit: (sheet: Sheet0) => void) {
+  const doc = parseXlsx(readFileSync(fx('01_CARGA_INICIAL/Ata_registro.xlsx')));
+  edit(doc.sheets.find((s) => s.name === 'Atividades')!);
+  return { meta: metaFor('Ata_registro.xlsx', { versionOrHash: version }), doc };
+}
+const rowOf = (sheet: Sheet0, id: string) => sheet.rows.find((r) => r.cells.ID === id)!;
+const pendingFor = async (id: string) => (await pending()).filter((s) => s.targetActivityId === id);
+
+describe('correções da rodada 1', () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it('A: ata nova citada como Origem de uma linha criada depois da carga ainda é analisada', async () => {
+    await initialLoad();
+    const v2 = registryV('v2', (sheet) => {
+      const base = rowOf(sheet, 'ACT-101');
+      sheet.rows.push({ rowNumber: 6, cellRefs: base.cellRefs, cells: { ...base.cells, ID: 'ACT-105', Atividade: 'Planejar newsletter', 'Responsáveis': 'Ana', Origem: 'Ata_2026-10-04.md' } });
+    });
+    await ingestExtracted(v2.meta, v2.doc, ctx);
+    const out = await ingestSource(metaFor('Ata_2026-10-04.md'), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), ctx);
+    expect(out.suggestionsCreated).toBe(1);
+    const creates = await prisma.suggestion.findMany({ where: { kind: 'create', sourceFileId: 'Ata_2026-10-04.md', reviewStatus: 'pending' } });
+    expect(creates).toHaveLength(1);
+    expect(JSON.parse(creates[0].proposedFields)).toMatchObject({ ownerIds: ['U-C'] });
+  });
+
+  it('B: falha da IA na reedição preserva a sugestão antiga; sucesso depois a substitui', async () => {
+    const failing: AIProvider = { name: 'falha', extract: async () => { throw new Error('timeout'); }, summarize: async () => null };
+    await initialLoad();
+    await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx);
+    const v2 = metaFor('Ata_2026-10-03', { fileId: 'ata03', versionOrHash: 'v2' });
+    const edited: FetchedContent = { format: 'markdown', text: ATA03.replace('**2026-10-07**', '**2026-10-08**') };
+    expect((await ingestSource(v2, edited, { provider: failing })).status).toBe('error');
+    expect((await prisma.suggestion.findMany()).map((s) => s.reviewStatus)).toEqual(['pending']);
+    expect((await prisma.source.findUnique({ where: { fileId: 'ata03' } }))!.syncStatus).toBe('error');
+    expect((await ingestSource(v2, edited, ctx)).status).toBe('processed');
+    const all = await prisma.suggestion.findMany({ orderBy: { createdAt: 'asc' } });
+    expect(all.map((s) => s.reviewStatus)).toEqual(['superseded', 'pending']);
+  });
+
+  describe('C: planilha vigente editada várias vezes', () => {
+    beforeEach(initialLoad);
+    const setPrazo = (value: string) => (sheet: Sheet0) => { rowOf(sheet, 'ACT-101').cells.Prazo = value; };
+
+    it('versão mais recente substitui a pendente anterior', async () => {
+      const v2 = registryV('v2', setPrazo('2026-10-09'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      expect((await pendingFor('ACT-101')).map((s) => JSON.parse(s.proposedFields))).toEqual([{ dueDate: '2026-10-09' }]);
+      const v3 = registryV('v3', setPrazo('2026-10-12'));
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      expect((await pendingFor('ACT-101')).map((s) => JSON.parse(s.proposedFields))).toEqual([{ dueDate: '2026-10-12' }]);
+      expect(await prisma.suggestion.count({ where: { targetActivityId: 'ACT-101', reviewStatus: 'superseded' } })).toBe(1);
+    });
+
+    it('voltar ao valor oficial remove a pendência; voltar a uma proposta antiga a reabre', async () => {
+      const v2 = registryV('v2', setPrazo('2026-10-09'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      const v3 = registryV('v3', setPrazo('2026-10-05'));
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(0);
+      const v4 = registryV('v4', setPrazo('2026-10-09'));
+      await ingestExtracted(v4.meta, v4.doc, ctx);
+      expect((await pendingFor('ACT-101')).map((s) => JSON.parse(s.proposedFields))).toEqual([{ dueDate: '2026-10-09' }]);
+    });
+
+    it('proposta rejeitada não é recriada por versões seguintes', async () => {
+      const v2 = registryV('v2', setPrazo('2026-10-09'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      const [s] = await pendingFor('ACT-101');
+      expect(await reviewSuggestion(s.id, 'U-B', { action: 'reject', note: 'Prazo mantido' })).toMatchObject({ ok: true });
+      const v3 = registryV('v3', (sheet) => { setPrazo('2026-10-09')(sheet); rowOf(sheet, 'ACT-103').cells['Notas e bloqueios'] = 'Sala confirmada para 09/10'; });
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(0);
+      expect(await prisma.suggestion.count({ where: { targetActivityId: 'ACT-101' } })).toBe(1);
+    });
+
+    it('prazo ilegível não gera proposta de prazo e fica registrado', async () => {
+      const v2 = registryV('v2', setPrazo('sexta'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(0);
+      const issues = await prisma.discardedItem.findMany({ where: { sourceFileId: 'Ata_registro.xlsx' } });
+      expect(issues.some((d) => d.excerpt.includes('sexta'))).toBe(true);
+    });
+
+    it('responsável não reconhecido não gera proposta de limpar responsáveis', async () => {
+      const v2 = registryV('v2', (sheet) => { rowOf(sheet, 'ACT-101').cells['Responsáveis'] = 'Fulano'; });
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(0);
+    });
+  });
+
+  it('D: ata lida antes da importação inicial fica com erro e é reprocessada depois', async () => {
+    await ingestSource(metaFor('INDEX.md'), md('01_CARGA_INICIAL/INDEX.md'), ctx);
+    const out = await ingestSource(metaFor('Ata_2026-10-01.md'), md('01_CARGA_INICIAL/Ata_2026-10-01.md'), ctx);
+    expect(out.status).toBe('error');
+    expect(await prisma.suggestion.count()).toBe(0);
+    expect((await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } }))!.processedVersion).toBeNull();
+    await ingestSource(metaFor('Ata_registro.xlsx'), xlsx('01_CARGA_INICIAL/Ata_registro.xlsx'), ctx);
+    const again = await ingestSource(metaFor('Ata_2026-10-01.md'), md('01_CARGA_INICIAL/Ata_2026-10-01.md'), ctx);
+    expect(again).toMatchObject({ status: 'processed', suggestionsCreated: 0 });
+    expect(again.reason).toContain('origem');
+    expect(await prisma.suggestion.count()).toBe(0);
+  });
+
+  it('E: o mesmo arquivo em conflito gera um único source_conflict mesmo com nova versão', async () => {
+    await initialLoad();
+    await ingestSource(metaFor('Ata - copia vazia.xlsx', { fileId: 'copia' }), xlsx('03_CONFLITO/Ata - copia vazia.xlsx'), ctx);
+    await ingestSource(metaFor('Ata - copia vazia.xlsx', { fileId: 'copia', versionOrHash: 'v2' }), xlsx('03_CONFLITO/Ata - copia vazia.xlsx'), ctx);
+    expect(await prisma.suggestion.count({ where: { kind: 'source_conflict' } })).toBe(1);
+  });
+});

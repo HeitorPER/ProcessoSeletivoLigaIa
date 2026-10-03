@@ -14,15 +14,25 @@ export async function registerSourceConflict(meta: SourceMeta, doc: SpreadsheetD
     rowCount === 0
       ? ['A planilha está vazia: tratá-la como fonte apagaria todas as atividades oficiais']
       : [`A planilha tem ${rowCount} linha(s) de atividade que podem divergir do registro oficial`];
+  const evidence = `Planilha "${meta.name}" — aba(s): ${doc.sheets.map((s) => s.name).join(', ')}; ${rowCount} linha(s) de atividade`;
+  // Um conflito por arquivo: só substitui o pendente se o conteúdo mudou.
+  const older = await prisma.suggestion.findMany({ where: { sourceFileId: meta.fileId, kind: 'source_conflict', reviewStatus: 'pending', NOT: { evidence } } });
+  if (older.length > 0) {
+    await prisma.suggestion.updateMany({
+      where: { id: { in: older.map((s) => s.id) } },
+      data: { reviewStatus: 'superseded', reviewedAt: new Date(), reviewNote: 'Planilha foi editada; conflito substituído pela análise da nova versão' },
+    });
+  }
   const ok = await saveSuggestion(
     {
       kind: 'source_conflict', targetActivityId: null, proposedFields: {},
-      evidence: `Planilha "${meta.name}" — aba(s): ${doc.sheets.map((s) => s.name).join(', ')}; ${rowCount} linha(s) de atividade`,
+      evidence,
       evidenceLocator: meta.path ? `${meta.path}/${meta.name}` : meta.name,
       reason: `${reason}. Nenhuma atividade foi alterada. Aceitar = analisar as linhas como sugestões; rejeitar = descartar a planilha.`,
       uncertainties, front: null,
     },
     meta,
+    { versionless: true },
   );
   return ok ? 1 : 0;
 }
