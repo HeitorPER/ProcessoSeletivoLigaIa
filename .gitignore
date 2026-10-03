@@ -21,3 +21,6 @@ prisma/*.db-journal
 .DS_Store
 Thumbs.db
 *.log
+
+# workspace de execução (local)
+.superpowers/
