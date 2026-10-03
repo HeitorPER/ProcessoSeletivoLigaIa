@@ -42,7 +42,7 @@ export default async function NovidadesPage({ searchParams }: { searchParams: Pr
       {digest.nothingChanged ? (
         <Notice tone="ok" title={`Nada mudou para você ${label}.`}>Abaixo, só os prazos e bloqueios que continuam valendo.</Notice>
       ) : (
-        <AiSummary since={since.toISOString()} enabled={aiEnabled} />
+        <AiSummary key={since.toISOString()} since={since.toISOString()} enabled={aiEnabled} />
       )}
 
       <DigestSection id="confirmado" title="Confirmado" hint="Mudanças já aplicadas ao registro oficial (aprovadas ou feitas na Central)." items={digest.confirmed} empty="Nenhuma mudança confirmada no período." />

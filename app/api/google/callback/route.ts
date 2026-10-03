@@ -1,13 +1,7 @@
-import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { exchangeCode } from '@/lib/google/oauth';
-import { OAUTH_STATE_COOKIE } from '@/lib/google/state';
-
-function sameState(a: string | undefined, b: string | null): boolean {
-  if (!a || !b || a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
+import { OAUTH_STATE_COOKIE, readCookie, sameState } from '@/lib/google/state';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -17,7 +11,7 @@ export async function GET(req: Request) {
     return res;
   };
   if (url.searchParams.get('error')) return back('erro=negado');
-  const cookieState = req.headers.get('cookie')?.match(new RegExp(`${OAUTH_STATE_COOKIE}=([^;]+)`))?.[1];
+  const cookieState = readCookie(req.headers.get('cookie'), OAUTH_STATE_COOKIE);
   if (!sameState(cookieState, url.searchParams.get('state'))) return back('erro=state');
   const code = url.searchParams.get('code');
   if (!code) return back('erro=troca');
@@ -27,6 +21,11 @@ export async function GET(req: Request) {
     console.error('[oauth] falha ao concluir a conexão:', (e as Error).message); // nunca logar o código
     return back('erro=troca');
   }
-  await prisma.syncRequest.create({ data: { requestedBy: 'sistema' } });
+  try {
+    await prisma.syncRequest.create({ data: { requestedBy: 'sistema' } });
+  } catch (e) {
+    // o token já foi salvo; o worker sincroniza no próximo ciclo mesmo sem o pedido imediato
+    console.error('[oauth] conectado, mas não foi possível pedir a primeira sincronização:', (e as Error).message);
+  }
   return back('conectado=1');
 }
