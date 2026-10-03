@@ -1,0 +1,50 @@
+{
+  "name": "central-liga-ia",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n web,worker -c blue,cyan \"next dev\" \"tsx watch worker/index.ts\"",
+    "dev:web": "next dev",
+    "worker": "tsx worker/index.ts",
+    "build": "next build",
+    "start": "concurrently -n web,worker -c blue,cyan \"next start\" \"tsx worker/index.ts\"",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "setup": "prisma migrate deploy && prisma db seed",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force && prisma db seed",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.5",
+    "googleapis": "^183.0.0",
+    "next": "16.3.8",
+    "openai": "^7.27.0",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.8",
+    "prisma": "^7.10.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.3"
+  }
+}

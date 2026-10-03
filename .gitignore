@@ -24,3 +24,7 @@ Thumbs.db
 
 # workspace de execução (local)
 .superpowers/
+
+/generated/
+prisma/test.db*
+prisma/dev.db*
