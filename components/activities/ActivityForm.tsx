@@ -27,13 +27,13 @@ export function ActivityForm({ mode, activityId, initial, members }: { mode: 'cr
       requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
-    const body = await res.json().catch(() => ({}));
+    const body = await res.json().catch(() => null);
     if (!res.ok) {
-      setErrors(body.errors ?? ['Não foi possível salvar.']);
+      setErrors(Array.isArray(body?.errors) && body.errors.length ? body.errors : [`Erro ao salvar (HTTP ${res.status})`]);
       requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
-    router.push(`/atividades/${body.id ?? activityId}`);
+    router.push(`/atividades/${body?.id ?? activityId}`);
     router.refresh();
   }
 
