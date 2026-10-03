@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Código gerado e áreas locais de ferramentas
+    "generated/**",
+    ".claude/**",
+    ".superpowers/**",
   ]),
 ]);
 

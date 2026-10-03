@@ -28,3 +28,6 @@ Thumbs.db
 /generated/
 prisma/test.db*
 prisma/dev.db*
+
+# worktrees de agentes (local)
+.claude/worktrees/
