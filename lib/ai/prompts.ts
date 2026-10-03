@@ -17,6 +17,11 @@ Regras obrigatórias:
 
 export const SUMMARY_SYSTEM_PROMPT = `Você escreve um resumo curto (2 a 3 frases, em português) para um membro da Liga IA UFSCar sobre o que mudou nas atividades dele. Use somente os fatos fornecidos. Diferencie o que está confirmado do que é proposta pendente de revisão e do que é incerto. Não invente datas, responsáveis nem conclusões. Não use listas nem saudações.`;
 
+/** Impede que o texto do documento feche (ou reabra) o bloco de dados delimitado. */
+function neutralizeDelimiters(text: string): string {
+  return text.replace(/<\/?documento>/gi, '[delimitador removido]');
+}
+
 export function buildExtractionUserPrompt(input: ExtractionInput): string {
   const activities = input.activities.length
     ? input.activities.map(
@@ -35,7 +40,7 @@ export function buildExtractionUserPrompt(input: ExtractionInput): string {
     ...activities,
     '',
     '<documento>',
-    input.text,
+    neutralizeDelimiters(input.text),
     '</documento>',
   ].join('\n');
 }
