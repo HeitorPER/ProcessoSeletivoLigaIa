@@ -56,13 +56,14 @@ function classifyMarkdown(input: ClassifyInput, doc: MarkdownDoc, authority: Aut
   }
 
   const base = baseFileName(input.name);
+  if (DIRECTION_NAMES.has(base)) return { kind: 'direction', reason: 'Documento de direção usado em "Comece aqui"', meetingDate: null };
+
   const looksLikeMinutes =
     Boolean(fm.data_da_reuniao) ||
     /(^|[\s_-])(ata|reuniao)([\s_-]|$)/.test(base) ||
     /^#\s.*\b(ata|reuni[aã]o)\b/im.test(doc.text.slice(0, 400));
   if (looksLikeMinutes) return { kind: 'minutes', reason: 'Ata de reunião: analisada para sugerir atividades', meetingDate };
 
-  if (DIRECTION_NAMES.has(base)) return { kind: 'direction', reason: 'Documento de direção usado em "Comece aqui"', meetingDate: null };
   return { kind: 'other', reason: 'Documento indexado; não é ata nem registro de atividades', meetingDate: null };
 }
 

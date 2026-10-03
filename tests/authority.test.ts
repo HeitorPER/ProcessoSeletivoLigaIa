@@ -29,6 +29,12 @@ describe('parseIndex', () => {
   it('INDEX sem fonte → nulos', () => {
     expect(parseIndex(md('# Índice\n\n- `x.md`: algo'))).toEqual({ registryFileName: null, registrySheet: null, supersededFileNames: [] });
   });
+  it('extrai aba com aspas tipográficas curvas', () => {
+    const docWithCurlyQuotes = md('- `Planilha.xlsx`, aba “Atividades”: fonte das atividades');
+    const result = parseIndex(docWithCurlyQuotes);
+    expect(result.registryFileName).toBe('Planilha.xlsx');
+    expect(result.registrySheet).toBe('Atividades');
+  });
 });
 
 describe('helpers', () => {
@@ -65,6 +71,9 @@ describe('classify', () => {
     expect(classify({ ...base, name: 'ESTADO-ATUAL.md', doc: md('# Estado', { status: 'parcial' }) }, authority).kind).toBe('direction');
     expect(classify({ ...base, name: 'GUIA_INICIAL.md', doc: md('# Comece aqui', { status: 'ativo' }) }, authority).kind).toBe('direction');
     expect(classify({ ...base, name: 'Notas soltas.md', doc: md('# Notas') }, authority).kind).toBe('other');
+  });
+  it('GUIA_INICIAL com data_da_reuniao no front-matter → direction (não minutes)', () => {
+    expect(classify({ ...base, name: 'GUIA_INICIAL.md', doc: md('# Comece aqui', { data_da_reuniao: '2026-10-01' }) }, authority).kind).toBe('direction');
   });
   it('planilha apontada pelo INDEX → activity_registry com a aba', () => {
     expect(classify({ ...base, name: 'Ata_registro.xlsx', doc: xlsx(sheet('Atividades', 4)) }, authority)).toMatchObject({ kind: 'activity_registry', registrySheet: 'Atividades' });
