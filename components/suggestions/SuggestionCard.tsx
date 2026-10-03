@@ -15,7 +15,7 @@ function heading(s: SuggestionView): string {
 }
 
 export function SuggestionCard({ s, members }: { s: SuggestionView; members: MemberInfo[] }) {
-  const docDate = s.source.documentDate ? formatDateBR(s.source.documentDate) : formatDateBR(toIsoDateSP(s.source.modifiedAt));
+  const dateLabel = s.source.documentDate ? `documento de ${formatDateBR(s.source.documentDate)}` : `modificado em ${formatDateBR(toIsoDateSP(s.source.modifiedAt))}`;
   return (
     <article id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-24 rounded border border-line p-4 md:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -31,7 +31,7 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
       <figure className="my-3 max-w-3xl">
         <blockquote className="border-l-4 border-accent bg-surface px-4 py-2 italic">“{s.evidence.replace(/\*\*/g, '')}”</blockquote>
         <figcaption className="mt-1 text-sm">
-          <SourceLink name={s.source.name} href={s.source.webUrl} syncStatus={s.source.syncStatus} /> · documento de {docDate}
+          <SourceLink name={s.source.name} href={s.source.webUrl} syncStatus={s.source.syncStatus} /> · {dateLabel}
           {s.evidenceLocator ? ` · ${s.evidenceLocator}` : ''}
         </figcaption>
       </figure>
@@ -48,9 +48,15 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
         s.canReview ? <ReviewPanel id={s.id} kind={s.kind} proposed={s.proposedFields} members={members} /> : <p className="mt-3 text-muted">Aguardando revisão de {s.reviewerNames.join(' ou ') || 'um revisor'}.</p>
       ) : (
         <p className="mt-3 text-sm">
-          {s.reviewStatus === 'superseded' ? 'Substituída porque o documento foi editado' : `${s.reviewStatus === 'rejected' ? 'Rejeitada' : 'Aceita'} por ${s.reviewerName ?? '—'}`}
-          {s.reviewedAt ? ` em ${formatDateTimeBR(s.reviewedAt)}` : ''}
-          {s.reviewNote ? ` — “${s.reviewNote}”` : ''}
+          {s.reviewStatus === 'superseded' ? (
+            <>Substituída{s.reviewNote ? `: ${s.reviewNote}` : ''}</>
+          ) : (
+            <>
+              {`${s.reviewStatus === 'rejected' ? 'Rejeitada' : s.reviewStatus === 'adjusted' ? 'Ajustada e aceita' : 'Aceita'} por ${s.reviewerName ?? '—'}`}
+              {s.reviewedAt ? ` em ${formatDateTimeBR(s.reviewedAt)}` : ''}
+              {s.reviewNote ? ` — “${s.reviewNote}”` : ''}
+            </>
+          )}
           {s.resultActivityId && <> · <Link href={`/atividades/${s.resultActivityId}`} className="text-brand underline">ver {s.resultActivityId}</Link></>}
         </p>
       )}
