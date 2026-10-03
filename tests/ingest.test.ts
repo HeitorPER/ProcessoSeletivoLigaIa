@@ -281,6 +281,48 @@ describe('correções da rodada 1', () => {
     });
   });
 
+  describe('rodada 2: linhas adicionadas e removidas depois da importação', () => {
+    beforeEach(initialLoad);
+    const addRow105 = (prazo: string) => (sheet: Sheet0) => {
+      const base = rowOf(sheet, 'ACT-101');
+      sheet.rows.push({ rowNumber: 6, cellRefs: base.cellRefs, cells: { ...base.cells, ID: 'ACT-105', Atividade: 'Planejar newsletter', 'Responsáveis': 'Ana', Prazo: prazo, Origem: '' } });
+    };
+
+    it('linha criada depois da carga e aceita continua sendo acompanhada', async () => {
+      const v2 = registryV('v2', addRow105('2026-10-20'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      const [create] = await prisma.suggestion.findMany({ where: { kind: 'create', proposedId: 'ACT-105', reviewStatus: 'pending' } });
+      expect(await reviewSuggestion(create.id, 'U-B', { action: 'accept' })).toMatchObject({ ok: true });
+      expect(await pending()).toHaveLength(0);
+      const v3 = registryV('v3', addRow105('2026-10-25'));
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      const upd = await pendingFor('ACT-105');
+      expect(upd).toHaveLength(1);
+      expect(JSON.parse(upd[0].proposedFields)).toEqual({ dueDate: '2026-10-25' });
+    });
+
+    it('linha removida da planilha substitui as sugestões pendentes e mantém a atividade', async () => {
+      const v2 = registryV('v2', (sheet) => { rowOf(sheet, 'ACT-101').cells.Prazo = '2026-10-09'; });
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(1);
+      const v3 = registryV('v3', (sheet) => { sheet.rows = sheet.rows.filter((r) => r.cells.ID !== 'ACT-101'); });
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      expect(await pendingFor('ACT-101')).toHaveLength(0);
+      expect(await prisma.suggestion.count({ where: { targetActivityId: 'ACT-101', reviewStatus: 'superseded' } })).toBe(1);
+      expect(await prisma.activity.findUnique({ where: { id: 'ACT-101' } })).not.toBeNull();
+    });
+
+    it('create pendente de linha que sumiu da planilha é substituído', async () => {
+      const v2 = registryV('v2', addRow105('2026-10-20'));
+      await ingestExtracted(v2.meta, v2.doc, ctx);
+      expect(await pending()).toHaveLength(1);
+      const v3 = registryV('v3', () => {});
+      await ingestExtracted(v3.meta, v3.doc, ctx);
+      expect(await pending()).toHaveLength(0);
+      expect((await prisma.discardedItem.findMany()).some((d) => d.excerpt.startsWith('ACT-105'))).toBe(true);
+    });
+  });
+
   it('D: ata lida antes da importação inicial fica com erro e é reprocessada depois', async () => {
     await ingestSource(metaFor('INDEX.md'), md('01_CARGA_INICIAL/INDEX.md'), ctx);
     const out = await ingestSource(metaFor('Ata_2026-10-01.md'), md('01_CARGA_INICIAL/Ata_2026-10-01.md'), ctx);

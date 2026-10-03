@@ -3,6 +3,7 @@ import { formatFieldValue } from '@/lib/activities/format';
 import { createActivity, getActivitySnapshot } from '@/lib/activities/service';
 import { isIsoDate } from '@/lib/dates';
 import { prisma } from '@/lib/db';
+import { parseJson } from '@/lib/json';
 import { loadMembers } from '@/lib/members';
 import { normalizeName } from '@/lib/text';
 import { FRONTS, type ActivityFields, type ActivityStatus, type CellValue, type MemberInfo, type ProposedSuggestion, type Sheet, type SourceMeta, type SourceMetaJson, type SpreadsheetDoc } from '@/lib/types';
@@ -144,7 +145,8 @@ export function cellEvidence(sheetName: string, row: RegistryRow, keys: (keyof A
     .join('; ');
 }
 
-const SUPERSEDE_NOTE = 'Planilha vigente foi editada novamente; sugestão substituída pela versão mais recente';
+const REMOVED_NOTE = 'Linha removida da planilha vigente; sugestão substituída';
+const SUPERSEDE_NOTE ='Planilha vigente foi editada novamente; sugestão substituída pela versão mais recente';
 
 /**
  * `baseline` = linhas da importação inicial (nunca atualizada). Uma linha só vira proposta onde difere do baseline
@@ -153,9 +155,10 @@ const SUPERSEDE_NOTE = 'Planilha vigente foi editada novamente; sugestão substi
 async function diffRegistry(meta: SourceMeta, sheetName: string, rows: RegistryRow[], baseline: Record<string, ActivityFields>, members: MemberInfo[]): Promise<number> {
   let created = 0;
   for (const row of rows) {
-    const before = baseline[row.id];
     const official = await getActivitySnapshot(row.id);
-    if (!before && !official) {
+    // Linha adicionada depois da importação e já aceita: a base de comparação é o que a planilha dizia na proposta aceita.
+    const before = baseline[row.id] ?? (official ? await acceptedCreateFields(meta.fileId, row.id) : undefined);
+    if (!baseline[row.id] && !official) {
       const proposal: ProposedSuggestion = {
         kind: 'create', targetActivityId: null, proposedId: row.id, proposedFields: row.fields,
         evidence: `${sheetName}!${row.cellRefs.id ?? `A${row.rowNumber}`}: ${row.id} — ${row.fields.title}`,
@@ -187,13 +190,36 @@ async function diffRegistry(meta: SourceMeta, sheetName: string, rows: RegistryR
     );
     if (ok) created++;
   }
-  const removed = Object.keys(baseline).filter((id) => !rows.some((r) => r.id === id));
+  // Linhas que sumiram da planilha: da importação inicial (baseline) ou adicionadas depois (propostas de criação deste arquivo).
+  const present = new Set(rows.map((r) => r.id));
+  const removed = new Map<string, string>();
+  for (const [id, f] of Object.entries(baseline)) if (!present.has(id)) removed.set(id, f.title);
+  const postImport = await prisma.suggestion.findMany({
+    where: { sourceFileId: meta.fileId, kind: 'create', reviewStatus: { in: ['pending', 'accepted', 'adjusted'] }, proposedId: { not: null } },
+    orderBy: { createdAt: 'asc' },
+  });
+  for (const s of postImport) {
+    if (s.proposedId && !present.has(s.proposedId) && !(s.proposedId in baseline)) removed.set(s.proposedId, parseJson<Partial<ActivityFields>>(s.proposedFields, {}).title ?? s.proposedId);
+  }
+  for (const id of removed.keys()) {
+    await supersedePendingForTarget(meta.fileId, 'update', id, null, REMOVED_NOTE);
+    await supersedePendingForTarget(meta.fileId, 'create', id, null, REMOVED_NOTE);
+  }
   await saveDiscarded(
     meta.fileId,
     meta.versionOrHash,
-    removed.map((id) => ({ excerpt: `${id} — ${baseline[id].title}`, reason: 'Linha removida da planilha vigente; a atividade oficial foi mantida (remover exige decisão na aplicação)' })),
+    [...removed].map(([id, title]) => ({ excerpt: `${id} — ${title}`, reason: 'Linha removida da planilha vigente; a atividade oficial foi mantida (remover exige decisão na aplicação)' })),
   );
   return created;
+}
+
+/** Campos propostos pela planilha na criação mais recente aceita/ajustada para esta linha (base de comparação de linhas pós-importação). */
+async function acceptedCreateFields(fileId: string, rowId: string): Promise<ActivityFields | undefined> {
+  const s = await prisma.suggestion.findFirst({
+    where: { sourceFileId: fileId, kind: 'create', proposedId: rowId, reviewStatus: { in: ['accepted', 'adjusted'] } },
+    orderBy: [{ reviewedAt: 'desc' }, { createdAt: 'desc' }],
+  });
+  return (s ? parseJson<ActivityFields | null>(s.proposedFields, null) : null) ?? undefined;
 }
 
 export async function handleRegistry(meta: SourceMeta, doc: SpreadsheetDoc, sheetName: string, metaJson: SourceMetaJson): Promise<number> {
