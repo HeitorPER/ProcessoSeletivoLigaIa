@@ -37,10 +37,12 @@ export default async function ComeceAquiPage() {
           <h2 className="text-xl font-semibold">2. Como trabalhamos</h2>
           {o.howWeWork.text ? <MarkdownText text={o.howWeWork.text} /> : <p className="text-muted">Guia inicial ainda não disponível.</p>}
           {o.howWeWork.history.length > 0 && (
-            <p className="mt-2 text-sm text-muted">
-              Documentos históricos (não valem como regra atual):{' '}
-              {o.howWeWork.history.map((h) => <SourceLink key={h.fileId} name={h.name} href={h.webUrl} />)}
-            </p>
+            <div className="mt-2 text-sm text-muted">
+              <p>Documentos históricos (não valem como regra atual):</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {o.howWeWork.history.map((h) => <li key={h.fileId}><SourceLink name={h.name} href={h.webUrl} syncStatus={h.available ? undefined : 'unavailable'} /></li>)}
+              </ul>
+            </div>
           )}
         </li>
 

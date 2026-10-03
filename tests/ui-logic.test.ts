@@ -86,4 +86,25 @@ describe('getOnboarding', () => {
     expect(o.purpose.text).toBeNull();
     expect(o.gaps.join(' ')).toContain('indisponível');
   });
+  it('documento marcado como indisponível nunca mostra texto antigo (ESTADO-ATUAL e GUIA_INICIAL)', async () => {
+    await src('ESTADO-ATUAL.md', 'direction', read('ESTADO-ATUAL.md'), 'unavailable');
+    await src('GUIA_INICIAL.md', 'direction', read('GUIA_INICIAL.md'), 'unavailable');
+    const o = await getOnboarding('U-A', '2026-10-03');
+    expect(o.purpose.text).toBeNull();
+    expect(o.fronts.text).toBeNull();
+    expect(o.howWeWork.text).toBeNull();
+    expect(o.gaps).toEqual(expect.arrayContaining([
+      expect.stringContaining('ESTADO-ATUAL.md está indisponível no momento'),
+      expect.stringContaining('GUIA_INICIAL.md está indisponível no momento'),
+    ]));
+  });
+});
+
+describe('visitas concorrentes', () => {
+  beforeEach(resetDb);
+  it('duas primeiras visitas simultâneas não falham e só uma é "primeira"', async () => {
+    const results = await Promise.all([ensureFirstVisit('U-C', NOW), ensureFirstVisit('U-C', NOW)]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    await expect(Promise.all([touchVisit('U-B', NOW), touchVisit('U-B', NOW)])).resolves.toBeDefined();
+  });
 });

@@ -33,6 +33,11 @@ function toLink(s: SourceRow): DocLink {
   };
 }
 
+/** Documento sem texto ou marcado como indisponível: nunca exibir texto antigo. */
+function isUnavailable(s: SourceRow): boolean {
+  return s.syncStatus === 'unavailable' || !s.extractedText;
+}
+
 function sectionText(text: string, heading: RegExp): string | null {
   return parseMarkdown(text).sections.find((s) => heading.test(s.heading))?.text ?? null;
 }
@@ -47,11 +52,12 @@ export async function getOnboarding(memberId: string, today: string): Promise<On
 
   let purpose: OnboardingData['purpose'] = { text: null, provisional: true, confirmBy: null, source: estado ? toLink(estado) : null };
   if (!estado) gaps.push('Propósito: o documento ESTADO-ATUAL ainda não foi sincronizado');
-  else if (!estado.extractedText) gaps.push(`Propósito: ${estado.name} está indisponível no momento`);
+  else if (isUnavailable(estado)) gaps.push(`Propósito: ${estado.name} está indisponível no momento`);
   else {
-    const doc = parseMarkdown(estado.extractedText);
-    const body = parseMarkdown(stripFrontMatterLines(estado.extractedText)).sections.find((s) => s.level === 1)?.text ?? null;
-    const provisional = doc.frontMatter.status?.toLowerCase() !== 'ativo' || /provis[óo]ri/i.test(estado.extractedText);
+    const estadoText = estado.extractedText as string;
+    const doc = parseMarkdown(estadoText);
+    const body = parseMarkdown(stripFrontMatterLines(estadoText)).sections.find((s) => s.level === 1)?.text ?? null;
+    const provisional = doc.frontMatter.status?.toLowerCase() !== 'ativo' || /provis[óo]ri/i.test(estadoText);
     purpose = { text: body, provisional, confirmBy: doc.frontMatter.responsavel_por_confirmar ?? null, source: toLink(estado) };
     if (provisional) gaps.push(`Missão e propósito são provisórios — a confirmar${purpose.confirmBy ? ` por ${purpose.confirmBy}` : ''}`);
   }
@@ -59,10 +65,11 @@ export async function getOnboarding(memberId: string, today: string): Promise<On
   let fronts: OnboardingData['fronts'] = { text: null, source: guia ? toLink(guia) : null };
   let howText: string | null = null;
   if (!guia) gaps.push('Frentes e papéis: o documento GUIA_INICIAL ainda não foi sincronizado');
-  else if (!guia.extractedText) gaps.push(`Frentes e papéis: ${guia.name} está indisponível no momento`);
+  else if (isUnavailable(guia)) gaps.push(`Frentes e papéis: ${guia.name} está indisponível no momento`);
   else {
-    fronts = { text: sectionText(guia.extractedText, /frentes/i), source: toLink(guia) };
-    howText = sectionText(guia.extractedText, /membro novo/i);
+    const guiaText = guia.extractedText as string;
+    fronts = { text: sectionText(guiaText, /frentes/i), source: toLink(guia) };
+    howText = sectionText(guiaText, /membro novo/i);
   }
 
   const registrySource = state?.authorityFileId ? sources.find((s) => s.fileId === state.authorityFileId) : undefined;

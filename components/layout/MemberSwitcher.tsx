@@ -7,10 +7,16 @@ export function MemberSwitcher({ current, members }: { current: MemberInfo; memb
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState('');
   async function change(memberId: string) {
     setError(null);
-    const res = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId }) });
-    if (!res.ok) {
+    setAnnounce('');
+    try {
+      const res = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const name = members.find((m) => m.id === memberId)?.displayName ?? '';
+      setAnnounce(`Agora vendo como ${name}`);
+    } catch {
       setError('Não foi possível trocar de usuário.');
       return;
     }
@@ -27,7 +33,7 @@ export function MemberSwitcher({ current, members }: { current: MemberInfo; memb
           </option>
         ))}
       </select>
-      <span role="status" className="text-sm">{pending ? 'Atualizando…' : ''}</span>
+      <span role="status" className="text-sm">{pending ? 'Atualizando…' : announce}</span>
       {error && <span id="vendo-como-erro" role="alert" className="text-sm text-danger">{error}</span>}
     </div>
   );
