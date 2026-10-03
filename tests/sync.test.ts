@@ -19,6 +19,7 @@ class FakeDrive implements DriveApi {
   token = 1;
   failList = false;
   failChanges: Error | null = null;
+  failDownload = new Map<string, Error>();
   downloads = 0;
   exports = 0;
   add(f: FakeFile) { this.files.set(f.id, f); }
@@ -30,6 +31,8 @@ class FakeDrive implements DriveApi {
   async getFile(id: string) { return this.files.get(id) ?? null; }
   async download(id: string) {
     this.downloads++;
+    const boom = this.failDownload.get(id);
+    if (boom) throw boom;
     const f = this.files.get(id);
     if (!f?.content) throw new DriveError('notFound', 404);
     return f.content;
@@ -183,6 +186,82 @@ describe('ciclo de sincronização', () => {
     await runCycle(depsFor(drive), 'incremental');
     expect(await prisma.activity.count()).toBe(4);
     expect(await prisma.suggestion.count({ where: { kind: 'source_conflict' } })).toBe(1);
+  });
+
+  it('arquivo cujo processamento lança erro vira "error"; os demais são processados e o token avança', async () => {
+    drive.add(file('boom', 'boom.md', 'x'));
+    drive.add(file('ata04', 'Ata_2026-10-04.md', fx('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), { parents: ['sub'] }));
+    drive.failDownload.set('boom', new Error('boom'));
+    drive.change('boom');
+    drive.change('ata04');
+    const before = await prisma.syncState.findUnique({ where: { id: 1 } });
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r).toMatchObject({ processed: 1, errors: 1 });
+    expect(r.error).toBeUndefined();
+    expect(await prisma.source.findUnique({ where: { fileId: 'boom' } })).toMatchObject({ syncStatus: 'error' });
+    expect(await prisma.suggestion.count({ where: { sourceFileId: 'ata04' } })).toBe(1);
+    const after = await prisma.syncState.findUnique({ where: { id: 1 } });
+    expect(after).toMatchObject({ status: 'idle', startPageToken: String(Number(before!.startPageToken) + 1) });
+    // a próxima varredura tenta de novo e se recupera
+    drive.failDownload.clear();
+    const retry = await runCycle(depsFor(drive), 'full');
+    expect(retry.errors).toBe(0);
+    expect((await prisma.source.findUnique({ where: { fileId: 'boom' } }))!.syncStatus).not.toBe('error');
+  });
+
+  it('falha transitória de download (HTTP 500) vira "error", não "unavailable"', async () => {
+    drive.add({ ...drive.files.get('ESTADO-ATUAL.md')!, md5Checksum: 'md5-estado-editado' });
+    drive.failDownload.set('ESTADO-ATUAL.md', new DriveError('backendError', 500));
+    drive.change('ESTADO-ATUAL.md');
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r).toMatchObject({ errors: 1, unavailable: 0 });
+    const src = await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } });
+    expect(src!.syncStatus).toBe('error');
+    expect(src!.statusReason).toContain('próxima varredura completa');
+  });
+
+  it('arquivo na lixeira (evento com trashed) vira indisponível', async () => {
+    drive.add({ ...drive.files.get('GUIA_INICIAL.md')!, trashed: true });
+    drive.change('GUIA_INICIAL.md');
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r.unavailable).toBe(1);
+    expect(await prisma.source.findUnique({ where: { fileId: 'GUIA_INICIAL.md' } })).toMatchObject({ syncStatus: 'unavailable', extractedText: null });
+  });
+
+  it('arquivo conhecido movido para fora da pasta vira indisponível', async () => {
+    drive.add({ ...drive.files.get('Ata_2026-10-01.md')!, parents: ['outra-pasta'] });
+    drive.change('Ata_2026-10-01.md');
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r.unavailable).toBe(1);
+    const src = await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } });
+    expect(src!.syncStatus).toBe('unavailable');
+    expect(src!.statusReason).toContain('fora da pasta');
+  });
+
+  it('mudança no INDEX reavalia as planilhas não modificadas, uma vez cada', async () => {
+    drive.add(file('outro', 'Outro_registro.xlsx', fx('01_CARGA_INICIAL/Ata_registro.xlsx')));
+    drive.change('outro');
+    await runCycle(depsFor(drive), 'incremental');
+    expect((await prisma.source.findUnique({ where: { fileId: 'outro' } }))!.kind).toBe('unauthorized_sheet');
+    expect((await prisma.source.findUnique({ where: { fileId: 'reg' } }))!.kind).toBe('activity_registry');
+    const regBefore = (await prisma.source.findUnique({ where: { fileId: 'reg' } }))!.lastProcessedAt!;
+    const outroBefore = (await prisma.source.findUnique({ where: { fileId: 'outro' } }))!.lastProcessedAt!;
+
+    const index = fx('01_CARGA_INICIAL/INDEX.md').toString('utf8');
+    expect(index).toContain('`Ata_registro.xlsx`, aba `Atividades`');
+    drive.add({ ...drive.files.get('INDEX.md')!, content: Buffer.from(index.replace('`Ata_registro.xlsx`', '`Outro_registro.xlsx`')), md5Checksum: 'md5-index-editado' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const r = await runCycle(depsFor(drive), 'full');
+
+    // as duas planilhas não mudaram no Drive, mas foram reavaliadas contra o novo INDEX
+    const reg = await prisma.source.findUnique({ where: { fileId: 'reg' } });
+    const outro = await prisma.source.findUnique({ where: { fileId: 'outro' } });
+    expect(reg!.lastProcessedAt!.getTime()).toBeGreaterThan(regBefore.getTime());
+    expect(outro!.lastProcessedAt!.getTime()).toBeGreaterThan(outroBefore.getTime());
+    expect(reg!.kind).not.toBe('activity_registry'); // deixou de ser a fonte nomeada no INDEX
+    // INDEX + 2 planilhas reprocessadas; cada arquivo é contado uma única vez (9 arquivos monitorados)
+    expect(r).toMatchObject({ mode: 'full', processed: 3, errors: 0, unavailable: 0 });
+    expect(r.processed + r.ignored + r.errors + r.unavailable + r.unchanged).toBe(9);
   });
 
   it('ciclos concorrentes: o segundo é ignorado pelo lock', async () => {

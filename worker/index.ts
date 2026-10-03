@@ -34,6 +34,7 @@ async function tick() {
     });
     if (!mode) return;
     const requestCutoff = new Date();
+    let skippedByLock = false;
 
     const folderId = process.env.DRIVE_TEST_FOLDER_ID;
     if (!folderId) {
@@ -47,6 +48,7 @@ async function tick() {
         await setState({ status: 'auth_required', lastError: null });
       } else {
         const summary = await runCycle({ api: createDriveApi(auth), provider: getProvider(), rootFolderId: folderId }, mode);
+        skippedByLock = summary.skipped === 'locked';
         console.log(
           `[worker] ciclo ${summary.mode}${summary.skipped ? ' (ignorado: outro ciclo em andamento)' : ''}: ` +
             `${summary.processed} processados, ${summary.ignored} ignorados, ${summary.errors} com erro, ` +
@@ -56,7 +58,7 @@ async function tick() {
     }
     lastRunAt = Date.now();
     await setState({ nextRunAt: new Date(lastRunAt + INCREMENTAL_MS) });
-    if (request) await closeRequests(requestCutoff);
+    if (request && !skippedByLock) await closeRequests(requestCutoff); // pedido ignorado pelo lock fica para o próximo tick
   } catch (e) {
     console.error('[worker] erro no ciclo:', describeError(e));
   } finally {

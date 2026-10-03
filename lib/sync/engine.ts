@@ -76,7 +76,7 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
       await markSourceUnavailable(file.id, `Sem acesso ao conteúdo do arquivo (HTTP ${e.status})`);
       return 'unavailable';
     }
-    await prisma.source.update({ where: { fileId: file.id }, data: { syncStatus: 'error', statusReason: `Falha ao baixar o arquivo: ${describeError(e)}. Nova tentativa no próximo ciclo.` } });
+    await prisma.source.update({ where: { fileId: file.id }, data: { syncStatus: 'error', statusReason: `Falha ao baixar o arquivo: ${describeError(e)}. Nova tentativa na próxima varredura completa (até 10 min).` } });
     return 'error';
   }
 
@@ -98,7 +98,7 @@ async function processFileSafely(deps: SyncDeps, file: DriveFileWithPath, force 
   } catch (e) {
     console.error(`[sync] falha ao processar o arquivo ${file.id}:`, describeError(e));
     try {
-      await prisma.source.updateMany({ where: { fileId: file.id }, data: { syncStatus: 'error', statusReason: `Falha ao processar o arquivo: ${describeError(e)}. Nova tentativa no próximo ciclo.` } });
+      await prisma.source.updateMany({ where: { fileId: file.id }, data: { syncStatus: 'error', statusReason: `Falha ao processar o arquivo: ${describeError(e)}. Nova tentativa na próxima varredura completa (até 10 min).` } });
     } catch {
       // melhor esforço
     }
@@ -165,24 +165,34 @@ export async function runCycle(deps: SyncDeps, requested: SyncMode): Promise<Syn
 
     let authorityChanged = false;
     const counted = new Set<string>(); // arquivos já contabilizados neste ciclo
-    const evaluatedAfterChange = new Set<string>(); // processados depois de a autoridade mudar
+    const unchangedIds = new Set<string>(); // contabilizados como "sem mudança"
+    const ingestedAfterChange = new Set<string>(); // realmente (re)classificados depois de a autoridade mudar
     for (const file of [...candidates.values()].sort((a, b) => priority(a) - priority(b) || a.name.localeCompare(b.name))) {
       const r = await processFileSafely(deps, file);
       tally(t, r);
       counted.add(file.id);
-      if (authorityChanged) evaluatedAfterChange.add(file.id);
+      if (r === 'unchanged') unchangedIds.add(file.id);
+      if (authorityChanged && typeof r === 'object') ingestedAfterChange.add(file.id);
       if (typeof r === 'object' && r.authorityChanged) authorityChanged = true;
     }
     if (authorityChanged) {
-      // planilhas avaliadas antes de a autoridade mudar precisam ser reavaliadas (sem contar duas vezes)
-      const sheets = await prisma.source.findMany({ where: { NOT: { syncStatus: 'unavailable' }, mimeType: { in: [XLSX_MIME, GSHEET_MIME] } } });
+      // planilhas não classificadas depois da mudança de autoridade (inclusive as "sem mudança") são reavaliadas
+      const sheets = await prisma.source.findMany({
+        where: {
+          NOT: { syncStatus: 'unavailable' },
+          OR: [{ mimeType: { in: [XLSX_MIME, GSHEET_MIME] } }, { name: { endsWith: '.xlsx' } }],
+        },
+      });
       for (const s of sheets) {
-        if (evaluatedAfterChange.has(s.fileId)) continue;
+        if (ingestedAfterChange.has(s.fileId)) continue;
         try {
           const meta = await deps.api.getFile(s.fileId);
-          if (!meta) continue;
+          if (!meta || meta.trashed) continue;
           const r = await processFileSafely(deps, { ...meta, path: s.path }, true);
-          if (!counted.has(s.fileId)) tally(t, r);
+          if (unchangedIds.has(s.fileId)) {
+            t.unchanged--; // deixa de ser "sem mudança": foi reprocessado; cada arquivo é contado uma única vez
+            tally(t, r);
+          } else if (!counted.has(s.fileId)) tally(t, r);
           else if (r === 'error') t.errors++;
         } catch (e) {
           console.error(`[sync] falha ao reavaliar a planilha ${s.fileId}:`, describeError(e));
