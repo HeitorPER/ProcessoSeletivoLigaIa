@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
 import { decryptSecret, encryptSecret } from '@/lib/google/crypto';
 import { buildAuthUrl, disconnectGoogle, getAuthorizedClient, getGoogleConnection, maskEmail, saveRefreshToken } from '@/lib/google/oauth';
-import { toDriveFileMeta } from '@/lib/drive/client';
+import type { Auth, drive_v3 } from 'googleapis';
+import { createDriveApi, toDriveError, toDriveFileMeta } from '@/lib/drive/client';
 import { isRetryable, withRetry } from '@/lib/drive/retry';
 import { isInsideTree, walkTree } from '@/lib/drive/tree';
 import { DriveError, FOLDER_MIME, type DriveApi, type DriveFileMeta } from '@/lib/drive/types';
@@ -59,6 +60,7 @@ describe('oauth', () => {
     await prisma.source.create({ data: { fileId: 'f', name: 'n', mimeType: 'm', webUrl: 'u', modifiedAt: new Date(), versionOrHash: 'v', extractedText: 'texto' } });
     const revoke = vi.spyOn(Object.getPrototypeOf(client!), 'revokeToken').mockResolvedValue({} as never);
     await disconnectGoogle();
+    expect(revoke).toHaveBeenCalledWith('rt-123');
     revoke.mockRestore();
     expect(await prisma.googleToken.count()).toBe(0);
     expect((await prisma.source.findUnique({ where: { fileId: 'f' } }))!.extractedText).toBeNull();
@@ -78,6 +80,13 @@ describe('retry', () => {
     const always = vi.fn().mockRejectedValue(new DriveError('erro', 503));
     await expect(withRetry(always, { retries: 3, sleep })).rejects.toThrow('erro');
     expect(always).toHaveBeenCalledTimes(4);
+  });
+  it('espera 2s, 4s, 8s, 16s e 32s entre as tentativas padrão', async () => {
+    const waits: number[] = [];
+    const always = vi.fn().mockRejectedValue(new DriveError('erro', 503));
+    await expect(withRetry(always, { sleep: async (ms) => { waits.push(ms); } })).rejects.toThrow('erro');
+    expect(waits).toEqual([2000, 4000, 8000, 16000, 32000]);
+    expect(always).toHaveBeenCalledTimes(6);
   });
   it('não repete 404/403 comuns', async () => {
     const fn = vi.fn().mockRejectedValue(new DriveError('não encontrado', 404));
@@ -110,6 +119,14 @@ describe('árvore', () => {
     expect(folderPaths.nova).toBe('LIA/Atas/Nova');
     expect(await isInsideTree(api, meta('fora', 'fora.md', ['outra-pasta']), folderPaths, 'root')).toBeNull();
   });
+  it('isInsideTree trata ancestral inacessível (403/404) como fora da árvore', async () => {
+    for (const status of [403, 404]) {
+      const api = { ...fakeApi([]), getFile: async () => { throw new DriveError('negado', status); } };
+      expect(await isInsideTree(api, meta('x', 'x.md', ['pai-privado']), { root: 'LIA' }, 'root')).toBeNull();
+    }
+    const api = { ...fakeApi([]), getFile: async () => { throw new DriveError('falha', 500); } };
+    await expect(isInsideTree(api, meta('x', 'x.md', ['p']), { root: 'LIA' }, 'root')).rejects.toThrow('falha');
+  });
 });
 
 describe('toDriveFileMeta', () => {
@@ -117,5 +134,60 @@ describe('toDriveFileMeta', () => {
     expect(toDriveFileMeta({ id: 'x', name: 'Doc', mimeType: 'application/vnd.google-apps.document', modifiedTime: 't', version: '7', webViewLink: 'l', parents: ['p'], capabilities: { canDownload: true } })).toEqual({
       id: 'x', name: 'Doc', mimeType: 'application/vnd.google-apps.document', modifiedTime: 't', md5Checksum: null, version: '7', webViewLink: 'l', parents: ['p'], trashed: false, canDownload: true,
     });
+  });
+});
+
+describe('toDriveError', () => {
+  it('lê motivo de corpo JSON', () => {
+    const e = toDriveError({ response: { status: 403, data: { error: { errors: [{ reason: 'rateLimitExceeded' }], message: 'Limite' } } } }) as DriveError;
+    expect(e).toBeInstanceOf(DriveError);
+    expect([e.status, e.reason, e.message]).toEqual([403, 'rateLimitExceeded', 'Limite']);
+  });
+  it('lê motivo de corpo ArrayBuffer (download/export)', () => {
+    const body = Buffer.from('{"error":{"errors":[{"reason":"userRateLimitExceeded"}],"message":"Rate"}}');
+    const data = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength);
+    const e = toDriveError({ response: { status: 403, data } }) as DriveError;
+    expect(e).toBeInstanceOf(DriveError);
+    expect([e.status, e.reason, e.message]).toEqual([403, 'userRateLimitExceeded', 'Rate']);
+    expect(isRetryable(e)).toBe(true);
+    expect(toDriveError({ response: { status: 502, data: Buffer.from('<html>bad gateway') } })).toBeInstanceOf(DriveError);
+  });
+  it('mapeia falha de refresh do OAuth', () => {
+    const e = toDriveError({ response: { status: 400, data: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } } }) as DriveError;
+    expect([e.status, e.reason, e.message]).toEqual([400, 'invalid_grant', 'Token has been expired or revoked.']);
+  });
+  it('devolve erro de rede sem status inalterado', () => {
+    const net = { code: 'ECONNRESET' };
+    expect(toDriveError(net)).toBe(net);
+  });
+});
+
+describe('createDriveApi com drive injetado', () => {
+  const auth = {} as Auth.OAuth2Client;
+  const file = (id: string) => ({ id, name: id, mimeType: 'text/markdown', parents: ['root'] });
+  it('listChildren segue nextPageToken e concatena', async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ data: { files: [file('a')], nextPageToken: 'p2' } })
+      .mockResolvedValueOnce({ data: { files: [file('b')] } });
+    const api = createDriveApi(auth, { files: { list } } as unknown as drive_v3.Drive);
+    expect((await api.listChildren('root')).map((f) => f.id)).toEqual(['a', 'b']);
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls[1][0].pageToken).toBe('p2');
+  });
+  it('listChanges segue nextPageToken e devolve o último newStartPageToken', async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ data: { changes: [{ fileId: 'a', removed: false, file: file('a') }], nextPageToken: 'c2' } })
+      .mockResolvedValueOnce({ data: { changes: [{ fileId: 'b', removed: true }], newStartPageToken: 'novo' } });
+    const api = createDriveApi(auth, { changes: { list } } as unknown as drive_v3.Drive);
+    const res = await api.listChanges('c1');
+    expect(res.changes.map((c) => [c.fileId, c.removed])).toEqual([['a', false], ['b', true]]);
+    expect(res.newStartPageToken).toBe('novo');
+    expect(list.mock.calls[1][0].pageToken).toBe('c2');
+  });
+  it('getFile devolve null em 404', async () => {
+    const get = vi.fn().mockRejectedValue({ response: { status: 404, data: { error: { message: 'not found' } } } });
+    const api = createDriveApi(auth, { files: { get } } as unknown as drive_v3.Drive);
+    expect(await api.getFile('x')).toBeNull();
+    expect(get).toHaveBeenCalledTimes(1);
   });
 });

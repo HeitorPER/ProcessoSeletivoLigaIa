@@ -1,4 +1,14 @@
-import { FOLDER_MIME, type DriveApi, type DriveFileMeta } from './types';
+import { DriveError, FOLDER_MIME, type DriveApi, type DriveFileMeta } from './types';
+
+/** Ancestral sem permissão (403) ou inexistente (404) significa "não dá para alcançar a árvore por aqui", não falha de sync. */
+async function getAncestor(api: DriveApi, id: string): Promise<DriveFileMeta | null> {
+  try {
+    return await api.getFile(id);
+  } catch (e) {
+    if (e instanceof DriveError && (e.status === 403 || e.status === 404)) return null;
+    throw e;
+  }
+}
 
 export type DriveFileWithPath = DriveFileMeta & { path: string };
 
@@ -29,7 +39,7 @@ export async function isInsideTree(api: DriveApi, file: DriveFileMeta, folderPat
   for (const parent of file.parents) if (folderPaths[parent]) return { path: folderPaths[parent] };
   for (const parent of file.parents) {
     const chain: DriveFileMeta[] = [];
-    let current = await api.getFile(parent);
+    let current = await getAncestor(api, parent);
     for (let depth = 0; current && depth < 10; depth++) {
       chain.unshift(current);
       const known = current.parents.find((p) => folderPaths[p]);
@@ -42,7 +52,7 @@ export async function isInsideTree(api: DriveApi, file: DriveFileMeta, folderPat
         return { path };
       }
       if (current.id === rootId) return { path: folderPaths[rootId] ?? '' };
-      current = current.parents[0] ? await api.getFile(current.parents[0]) : null;
+      current = current.parents[0] ? await getAncestor(api, current.parents[0]) : null;
     }
   }
   return null;

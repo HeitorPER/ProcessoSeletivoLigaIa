@@ -19,21 +19,39 @@ export function toDriveFileMeta(f: drive_v3.Schema$File): DriveFileMeta {
   };
 }
 
-/** Converte erros do googleapis em DriveError com status e motivo; erros de rede seguem com seu `code`. */
-function wrap(e: unknown): never {
-  const err = e as { code?: number | string; status?: number; response?: { status?: number; data?: { error?: { errors?: { reason?: string }[]; message?: string } | string; error_description?: string } }; message?: string };
-  const status = err.response?.status ?? err.status ?? (typeof err.code === 'number' ? err.code : 0);
-  if (!status) throw e;
-  const data = err.response?.data;
+type ErrorBody = { error?: { errors?: { reason?: string }[]; message?: string } | string; error_description?: string };
+
+/** Em download/export (responseType 'arraybuffer') o corpo do erro chega como bytes: tenta ler como JSON. */
+function parseBody(data: unknown): ErrorBody | undefined {
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+    try {
+      const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+      return JSON.parse(Buffer.from(bytes).toString('utf8')) as ErrorBody;
+    } catch {
+      return undefined;
+    }
+  }
+  return data as ErrorBody | undefined;
+}
+
+/** Converte erros do googleapis em DriveError com status e motivo; erros de rede (sem status) voltam inalterados com seu `code`. */
+export function toDriveError(e: unknown): unknown {
+  const err = e as { code?: number | string; status?: number; response?: { status?: number; data?: unknown }; message?: string };
+  const status = err?.response?.status ?? err?.status ?? (typeof err?.code === 'number' ? err.code : 0);
+  if (!status) return e;
+  const data = parseBody(err.response?.data);
   const apiError = typeof data?.error === 'object' ? data.error : null;
   const reason = apiError?.errors?.[0]?.reason ?? (typeof data?.error === 'string' ? data.error : null);
-  throw new DriveError(apiError?.message ?? data?.error_description ?? err.message ?? 'Erro na Drive API', status, reason);
+  return new DriveError(apiError?.message ?? data?.error_description ?? err.message ?? 'Erro na Drive API', status, reason);
+}
+
+function wrap(e: unknown): never {
+  throw toDriveError(e);
 }
 
 const call = <T>(fn: () => Promise<T>) => withRetry(() => fn().catch(wrap));
 
-export function createDriveApi(auth: Auth.OAuth2Client): DriveApi {
-  const drive = google.drive({ version: 'v3', auth });
+export function createDriveApi(auth: Auth.OAuth2Client, drive: drive_v3.Drive = google.drive({ version: 'v3', auth })): DriveApi {
   return {
     async listChildren(folderId) {
       const out: DriveFileMeta[] = [];
