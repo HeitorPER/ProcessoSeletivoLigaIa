@@ -1,0 +1,23 @@
+# dependências e build
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# segredos — nunca versionar
+.env
+.env.*
+!.env.example
+client_secret*.json
+*token*.json
+
+# banco local (contém tokens criptografados e texto extraído)
+prisma/*.db
+prisma/*.db-journal
+
+# sistema
+.DS_Store
+Thumbs.db
+*.log
