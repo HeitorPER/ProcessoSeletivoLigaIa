@@ -112,7 +112,7 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 **O que fiz:**
 - Conferi que nada fora do `.env` depende da minha conta (nenhum ID de pasta, e-mail ou URL fixa no código).
 - **Troca de pasta.** Achei um risco parecido com o do banco de demonstração: se o `DRIVE_TEST_FOLDER_ID` muda com o banco já usado, a planilha da pasta nova seria tratada como homônima da importada. Decisão (aprovada pelo usuário): pausar a sincronização com um aviso que explica como recomeçar (`npm run db:reset`), sem apagar nada automaticamente.
-- **Custo medido** com o campo `usage` da API: cerca de 1.150–1.180 tokens de entrada e 240–400 de saída por ata (~US$ 0,0003) e ~160/70 por resumo (~US$ 0,00005).
+- **Custo medido** com o campo `usage` da API: cerca de 1.150–1.180 tokens de entrada e 240–400 de saída por ata (~US$ 0,0003) e ~160/70 por resumo (~US$ 0,00005). Gasto real de todo o dia, conferido no painel da OpenAI: 53 requisições, 31.413 tokens (24.853 de entrada e 6.560 de saída), US$ 0,01.
 - README com um roteiro rápido para quem vai avaliar e problemas comuns; limitação desatualizada ("Drive real não validado") corrigida; a decisão sobre a evidência com frase pulada entrou como primeiro exemplo de saída incorreta do modelo.
 - Teste novo para um Google Doc movido de fora para dentro da pasta (passo usado na demonstração).
 

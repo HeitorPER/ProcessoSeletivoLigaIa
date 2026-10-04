@@ -4,7 +4,7 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 
 - **Automatizado:** teste do Vitest (arquivo e nome do teste indicados), rodando contra um banco SQLite descartável, com os arquivos reais do pacote (`tests/fixtures`) e um Drive simulado.
 - **Local (observado):** execução na máquina de desenvolvimento, em 2026-10-03, com o banco de desenvolvimento carregado pelo mesmo código de ingestão usado pelo worker (`ingestSource`) e o servidor Next.js em `localhost:3000`, **sem** o Google Drive real.
-- **Drive real (observado em 2026-10-04):** OAuth com a conta Google do operador, pasta de teste própria (`central_liga_ia_test`), worker rodando (`npm run dev`) e `AI_PROVIDER=openai` com GPT-6 Luna real. Detalhes em [Execução com o Drive real](#execução-com-o-drive-real-2026-10-04). Casos ainda sem observação no Drive real continuam marcados como pendentes.
+- **Drive real (observado em 2026-10-04):** OAuth com a conta Google do operador, pasta de teste própria (`central_liga_ia_test`), worker rodando (`npm run dev`) e `AI_PROVIDER=openai` com GPT-6 Luna real (Painel da OpenAI em 2026-10-04: **53 requisições, 31.413 tokens** (24.853 de entrada e 6.560 de saída), **US$ 0,01** gastos). Detalhes em [Execução com o Drive real](#execução-com-o-drive-real-2026-10-04). Casos ainda sem observação no Drive real continuam marcados como pendentes.
 
 ## Verificação automatizada (2026-10-04, depois da validação no Drive real)
 
@@ -133,6 +133,7 @@ Ambiente: Windows 11, `npm run dev` (web + worker), OAuth com a conta Google do 
 | Edição de arquivo conhecido | Edição às 14:02:06, detecção automática às 14:03:22 (**1 min 16 s**, meta ≤ 15 min); sugestão antiga substituída |
 | Planilha homônima | Detectada pelo ciclo automático; conflito visível; atividades mantidas |
 | Lixeira | Arquivos apagados viraram "indisponível" com motivo |
+| Uso do GPT-6 Luna | Painel da OpenAI em 2026-10-04: 53 requisições, 31.413 tokens (24.853 de entrada e 6.560 de saída), US$ 0,01 gastos, incluindo análises, resumos, reproduções do erro de evidência e medição de custo. Uma ata custa ~1.150–1.180 tokens de entrada e 240–400 de saída (~US$ 0,0003) |
 
 **Problemas encontrados e corrigidos nesta execução:**
 

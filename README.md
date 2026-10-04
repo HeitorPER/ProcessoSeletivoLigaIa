@@ -209,6 +209,7 @@ Resumo de `03_Dados_de_Teste/LEIA_ME_PRIMEIRO.md`. Os mesmos arquivos estão em 
 ## 8. IA no produto
 
 - **Modelo:** OpenAI GPT-6 Luna (`gpt-6-luna`) pela Responses API, com saída em JSON Schema estrito. O código usa uma interface `AIProvider`, então outro provedor pode ser plugado.
+- **Testado com o modelo real** na validação com o Drive real (atas de 03/10 e 04/10, ata sem prazo, reedições e resumos de Ana e Davi; ver `VALIDACAO.md`). Painel da OpenAI em 2026-10-04: **53 requisições, 31.413 tokens** (24.853 de entrada e 6.560 de saída), **US$ 0,01** gastos.
 - **Modo sem IA:** `AI_PROVIDER=none` (ou `openai` sem chave) usa extração por regras: parágrafo com `ACT-nnn` e data ISO vira atualização; nome de membro + compromisso + data ISO vira criação; "talvez"/"ideia"/"sem decisão" são descartados. A interface informa que a IA está desativada.
 - **O texto das atas é tratado como dado não confiável:** vai entre delimitadores `<documento>`, o prompt manda ignorar instruções escritas no documento e os delimitadores dentro do texto são neutralizados.
 - **Validação independente do modelo** (`lib/ai/validate.ts`), aplicada antes de qualquer sugestão ser gravada:
@@ -233,7 +234,10 @@ Preço do GPT-6 Luna consultado em 2026-10-03: **US$ 0,10 por 1 milhão de token
 | Demonstração completa (poucas atas e alguns resumos) | | menos de US$ 0,01 |
 | Uso contínuo estimado: 20 atas e 200 resumos por mês | | ~US$ 0,02 por mês |
 
-Valores medidos em 2026-10-04 com o campo `usage` que a API devolve, usando o mesmo prompt da aplicação e as atas do pacote. Atas maiores ou uma lista de atividades maior aumentam a entrada de forma proporcional. O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
+Valores medidos em 2026-10-04 com o campo `usage` que a API devolve, usando o mesmo prompt da aplicação e as atas do pacote.
+
+**Gasto real de toda a validação:** Painel da OpenAI em 2026-10-04: **53 requisições, 31.413 tokens** (24.853 de entrada e 6.560 de saída), **US$ 0,01** gastos. Isso inclui as análises e os resumos feitos pela aplicação, as reproduções do erro de evidência e as medições acima. Pela tabela de preços, 24.853 × US$ 0,10/1M + 6.560 × US$ 0,50/1M ≈ US$ 0,006, que o painel arredonda para US$ 0,01.
+ Atas maiores ou uma lista de atividades maior aumentam a entrada de forma proporcional. O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
 
 ## 10. Testes
 
@@ -243,7 +247,7 @@ npm test
 
 Resultado da última execução (2026-10-04, depois da validação no Drive real): **16 arquivos, 231 testes passando**; `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run lint` sem erros. `npm run build` não foi executado nessa rodada. Os testes usam um banco SQLite descartável (`prisma/test.db`) e os arquivos reais do pacote em `tests/fixtures`. Eles cobrem: extratores (`.md`, `.xlsx`, front-matter, Google Docs); parser do `INDEX.md` e classificação (incluindo a planilha homônima vazia); importação inicial (4 atividades, `ACT-104` com dois donos, `ACT-103` bloqueada); diferença da planilha; validação da saída da IA; modo por regras nas atas de 03/10 e 04/10; provedor OpenAI com cliente simulado; idempotência (mesmo arquivo duas vezes, aprovação duas vezes); ciclo de sincronização com Drive simulado (novo, editado, renomeado, removido, lixeira e restaurado, falha temporária, 403 por limite de taxa ou cota × permissão, texto em cache apagado e restaurado sem reanálise, restauração com `INDEX.md` alterado que reclassifica, token revogado, trava de concorrência); ata antiga que não reverte decisão humana posterior (e ata que corrige a própria proposta aceita sem ajuste; ata sem data); criação, edição e revisão de atividades; permissões de revisão; "o que mudou" para Ana e Davi; rotas de revisão (403/200/409, incluindo conflito sem texto da planilha).
 
-O que **não** é coberto por testes automatizados: chamadas reais ao Google Drive e ao OpenAI, interface no navegador (teclado, 375 px). Esses casos estão no registro de validação, com o status real de cada um: [`VALIDACAO.md`](VALIDACAO.md).
+O que **não** é coberto por testes automatizados: chamadas reais ao Google Drive e ao OpenAI, interface no navegador (teclado, 375 px). Esses três foram verificados manualmente em 2026-10-04 (53 chamadas reais ao GPT-6 Luna). Esses casos estão no registro de validação, com o status real de cada um: [`VALIDACAO.md`](VALIDACAO.md).
 
 ## 11. Limitações conhecidas
 
@@ -285,7 +289,7 @@ O que **não** é coberto por testes automatizados: chamadas reais ao Google Dri
 
 **Para construir (desenvolvimento):** Claude Code (Claude, da Anthropic). O fluxo foi: design conduzido por perguntas (brainstorming), especificação escrita, plano de 14 tarefas, implementação por subagentes em worktrees git isolados em ondas paralelas, uma revisão por tarefa e rodadas de correção. Heitor aprovou cada decisão de design e revisou o resultado. O processo está no [`DIARIO_DE_BORDO.md`](DIARIO_DE_BORDO.md).
 
-**Dentro do produto:** OpenAI GPT-6 Luna (`gpt-6-luna`), opcional, para propor sugestões a partir de atas e redigir o resumo pessoal. Sem a chave, o modo por regras funciona sem IA.
+**Dentro do produto:** OpenAI GPT-6 Luna (`gpt-6-luna`), opcional, para propor sugestões a partir de atas e redigir o resumo pessoal. Sem a chave, o modo por regras funciona sem IA. Usado de verdade na validação: Painel da OpenAI em 2026-10-04: **53 requisições, 31.413 tokens** (24.853 de entrada e 6.560 de saída), **US$ 0,01** gastos.
 
 **Decisões que mudei depois de verificar saídas incorretas:**
 
