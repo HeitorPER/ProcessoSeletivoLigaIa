@@ -149,6 +149,24 @@ describe('atas novas e editadas', () => {
       expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-08')).toBe(false);
     });
   });
+  it('ata sem data: decisão humana depois da análise anterior continua protegida na reedição', async () => {
+    const semData = ATA03.replace(/^data_da_reuniao:.*$/m, '');
+    const m = (version: string, modifiedAt: Date) => metaFor('Ata reunião ferramentas.md', { fileId: 'ata-sem-data', versionOrHash: version, modifiedAt });
+    await ingestSource(m('v1', new Date()), { format: 'markdown', text: semData }, ctx);
+    const src = await prisma.source.findUnique({ where: { fileId: 'ata-sem-data' } });
+    expect(src).toMatchObject({ kind: 'minutes' });
+    expect(JSON.parse(src!.meta).meetingDate).toBeNull();
+    expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-07')).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await updateActivity('ACT-101', { dueDate: '2026-10-09' }, 'U-A'); // decisão humana depois da análise da v1
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    // a v2 só corrige um erro de digitação, editada depois da decisão: não pode reverter o prazo decidido
+    await ingestSource(m('v2', new Date()), { format: 'markdown', text: semData.replace('Participaram Ana', 'Estiveram presentes Ana') }, ctx);
+    expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-07')).toBe(false);
+    const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata-sem-data', sourceVersion: 'v2' } });
+    expect(discarded.some((d) => d.reason === LATER_DECISION_REASON && d.excerpt.includes('ACT-101'))).toBe(true);
+  });
   it('decisão humana anterior à reunião não bloqueia a proposta da ata', async () => {
     await updateActivity('ACT-101', { dueDate: '2026-10-02' }, 'U-A');
     await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', actorId: 'U-A' }, data: { timestamp: new Date('2026-09-30T15:00:00Z') } });

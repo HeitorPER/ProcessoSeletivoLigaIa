@@ -105,7 +105,7 @@ export async function ingestExtracted(meta: SourceMeta, doc: ExtractedDoc, ctx: 
     if (c.kind === 'activity_registry') {
       created = await handleRegistry(meta, doc as SpreadsheetDoc, c.registrySheet!, metaJson);
     } else if (c.kind === 'minutes') {
-      const r = await processMinutes(meta, doc as MarkdownDoc, c.meetingDate, ctx.provider, !existing?.processedVersion);
+      const r = await processMinutes(meta, doc as MarkdownDoc, c.meetingDate, ctx.provider, !existing?.processedVersion, existing?.lastProcessedAt ?? null);
       created = r.created;
       if (r.note) reason = r.note;
     } else if (c.kind === 'unauthorized_sheet') {
