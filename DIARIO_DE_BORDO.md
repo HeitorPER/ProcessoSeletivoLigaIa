@@ -101,4 +101,6 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 
 - **Conflito de planilha que saiu da pasta.** A planilha homônima foi enviada primeiro para a subpasta errada e apagada; o alerta dela continuou pendente, e "Analisar linhas" só devolveria erro. Decisão do usuário: manter o alerta pendente com o aviso "Planilha fora da pasta" e só o descarte liberado.
 
+- **Rolagem horizontal em 375 px.** Na verificação no navegador, `/sugestoes` passava de 375 px por causa de um caminho de pasta longo sem espaços, e `/minhas` e `/atividades` por 3 px (prazo e rótulo "Vence em…" sem quebra). Correção: o local da evidência pode quebrar dentro do caminho e o rótulo do prazo desce de linha; as 8 páginas cabem em 375 px.
+
 **Como foi feito:** teste primeiro (falhando), depois a correção. Resultado: 16 arquivos e 229 testes passando; typecheck e lint sem erros.

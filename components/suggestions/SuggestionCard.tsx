@@ -36,7 +36,7 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
 
       <figure className="my-3 max-w-3xl">
         <blockquote className="border-l-4 border-accent bg-surface px-4 py-2 italic">“{s.evidence.replace(/\*\*/g, '')}”</blockquote>
-        <figcaption className="mt-1 text-sm">
+        <figcaption className="mt-1 text-sm [overflow-wrap:anywhere]">
           <SourceLink name={s.source.name} href={s.source.webUrl} syncStatus={s.source.syncStatus} /> · {dateLabel}
           {s.evidenceLocator ? ` · ${s.evidenceLocator}` : ''}
         </figcaption>

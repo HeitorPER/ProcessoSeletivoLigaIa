@@ -7,9 +7,10 @@ export function DueLabel({ dueDate, today, status }: { dueDate: string | null; t
   if (!dueDate) return <span className="italic text-muted">A definir</span>;
   const info = dueInfo(dueDate, today);
   return (
-    <span className="whitespace-nowrap">
-      <time dateTime={dueDate}>{formatDateBR(dueDate)}</time>
-      {status !== 'done' && <span className={TONE[info.tone]}> · {info.label}</span>}
+    // Data e rótulo não quebram por dentro, mas o rótulo pode descer de linha em telas estreitas (375 px).
+    <span>
+      <time dateTime={dueDate} className="whitespace-nowrap">{formatDateBR(dueDate)}</time>
+      {status !== 'done' && <span className={`whitespace-nowrap ${TONE[info.tone]}`}> · {info.label}</span>}
     </span>
   );
 }

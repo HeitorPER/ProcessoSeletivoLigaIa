@@ -72,7 +72,7 @@ export function ActivityList({ items, today }: { items: ActivityListItem[]; toda
           <li key={a.id} className="rounded border border-line p-4">
             <Link href={`/atividades/${a.id}`} className="text-lg font-semibold text-brand underline">{a.title}</Link>
             <p className="text-sm text-muted">{a.id}{a.front ? ` · ${a.front}` : ''}</p>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 [overflow-wrap:anywhere]">
               <dt className="font-medium">Responsáveis</dt><dd><Owners a={a} /></dd>
               <dt className="font-medium">Prazo</dt><dd><DueLabel dueDate={a.dueDate} today={today} status={a.status} /></dd>
               <dt className="font-medium">Estado</dt><dd><StatusBadge status={a.status} /></dd>
