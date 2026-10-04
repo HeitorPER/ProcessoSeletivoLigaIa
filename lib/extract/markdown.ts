@@ -8,11 +8,11 @@ export function unescapeMarkdown(text: string): string {
 
 /** O export `text/markdown` do Google Docs escapa caracteres e usa espaço não separável. */
 export function normalizeGoogleDocMarkdown(text: string): string {
-  return unescapeMarkdown(text.replace(/ /g, ' '));
+  return unescapeMarkdown(text.replace(/\u00A0/g, ' '));
 }
 
 export function parseMarkdown(raw: string): MarkdownDoc {
-  const text = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  const text = raw.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
   const { data } = parseFrontMatter(text);
   const sections: Section[] = [];
   let current: Section = { heading: '', level: 0, text: '', startLine: 1 };

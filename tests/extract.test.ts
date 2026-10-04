@@ -43,13 +43,13 @@ describe('markdown', () => {
     expect(doc.frontMatter.substituido_por).toContain('GUIA_INICIAL.md');
   });
   it('normaliza CRLF e BOM', () => {
-    const doc = parseMarkdown('﻿# A\r\n\r\nstatus: ativo\r\n\r\n## B\r\ntexto');
+    const doc = parseMarkdown('\uFEFF# A\r\n\r\nstatus: ativo\r\n\r\n## B\r\ntexto');
     expect(doc.frontMatter.status).toBe('ativo');
     expect(doc.sections.map((s) => s.heading)).toEqual(['A', 'B']);
     expect(doc.text.includes('\r')).toBe(false);
   });
   it('Google Docs exportado como markdown: escapes e espaço não separável', () => {
-    const exported = '# Ata de reunião\n\nstatus: ativo\n\ndata\\_da\\_reuniao: 2026\\-10\\-03\n\nO prazo mudou para **2026\\-10\\-07**. Fim.';
+    const exported = '# Ata de reunião\n\nstatus: ativo\n\ndata\\_da\\_reuniao: 2026\\-10\\-03\n\nO prazo mudou para **2026\\-10\\-07**.\u00A0Fim.';
     const doc = parseMarkdown(normalizeGoogleDocMarkdown(exported));
     expect(doc.frontMatter.data_da_reuniao).toBe('2026-10-03');
     expect(doc.text).toContain('**2026-10-07**. Fim.');
