@@ -6,14 +6,14 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 - **Local (observado):** execução na máquina de desenvolvimento, em 2026-10-03, com o banco de desenvolvimento carregado pelo mesmo código de ingestão usado pelo worker (`ingestSource`) e o servidor Next.js em `localhost:3000`, **sem** o Google Drive real.
 - **Drive real — pendente:** exige as credenciais Google do operador e a pasta de teste. **Ainda não foi executado.** Os passos exatos estão no [roteiro](#roteiro-para-executar-com-a-pasta-real-do-drive) abaixo e a coluna "Resultado observado" será atualizada depois dele.
 
-## Verificação automatizada (2026-10-04, revisão final)
+## Verificação automatizada (2026-10-04, re-revisão)
 
 | Comando | Resultado |
 | --- | --- |
-| `npm test` | 16 arquivos, **212 testes passando**, 0 falhas |
+| `npm test` | 16 arquivos, **222 testes passando**, 0 falhas |
 | `npm run lint` | sem erros |
 | `npm run typecheck` (`next typegen` + `tsc --noEmit`) | sem erros |
-| `npm run build` | não executado na revisão final (o servidor de desenvolvimento em uso compartilha a pasta `.next`); a última execução sem erros foi a da integração, em 2026-10-03, antes das correções finais |
+| `npm run build` | não executado na revisão final nem na re-revisão (o servidor de desenvolvimento em uso compartilha a pasta `.next`); a última execução sem erros foi a da integração, em 2026-10-03, antes das correções finais |
 
 ## Resumo dos casos
 
@@ -58,15 +58,16 @@ Formato: arquivo — nome do teste.
 **4. Edição de documento já conectado**
 - `tests/ingest.test.ts` — "edição da ata substitui a sugestão pendente da versão antiga"; "reprocessar ata após aceite não recria sugestão"; "o mesmo evento duas vezes não duplica sugestões"; "B: falha da IA na reedição preserva a sugestão antiga; sucesso depois a substitui"
 - `tests/sync.test.ts` — "edição gera nova versão sem duplicar a fonte; renomear não reprocessa"
-- `tests/ingest.test.ts` — "ata antiga reanalisada não propõe reverter decisão humana posterior (spec §3, regra 1)"; "decisão humana anterior à reunião não bloqueia a proposta da ata"
+- `tests/ingest.test.ts` — "ata antiga reanalisada não propõe reverter decisão humana posterior (spec §3, regra 1)"; "decisão humana anterior à reunião não bloqueia a proposta da ata"; "ata corrigindo a própria proposta já aprovada" › "aceita sem ajuste: a correção da mesma ata vira sugestão pendente", "ajustada pelo revisor: continua protegida contra a correção da ata", "edição humana direta depois da aprovação continua protegida"; "ata sem data: decisão humana depois da análise anterior continua protegida na reedição"
 - `tests/suggestions-view.test.ts` — "pendente mostra o valor oficial atual (não a foto do momento da sugestão)"
+- `tests/digest.test.ts` — "proposta pendente compara com o valor oficial de agora, não com a foto do momento da sugestão"
 
 **5. Conflito**
 - `tests/ingest.test.ts` — "planilha vazia homônima não apaga nada e vira conflito visível"; "cópia com o mesmo nome da fonte vigente (outro fileId) não reimporta"; "E: o mesmo arquivo em conflito gera um único source_conflict mesmo com nova versão"
 - `tests/sync.test.ts` — "planilha vazia homônima numa subpasta não apaga atividades"; "mudança no INDEX reavalia as planilhas não modificadas, uma vez cada"
 - `tests/authority.test.ts` — "planilha vazia homônima → unauthorized_sheet"
 - `tests/activities.test.ts` — "conflito de fonte: aceitar pede análise; rejeitar descarta"
-- `tests/review-request.test.ts` — "conflito de fonte" › "aceitar -> 200 com contagem analisada"; "falha na análise depois de registrar a revisão ainda responde 200 com aviso"
+- `tests/review-request.test.ts` — "conflito de fonte" › "aceitar -> 200 com contagem analisada"; "falha na análise depois de registrar a revisão ainda responde 200 com aviso"; "aceitar com o texto da planilha indisponível -> 409 sem registrar a revisão (a sugestão continua pendente)"
 
 **6. Ideia vaga**
 - `tests/ai.test.ts` — "ata 04/10 → uma criação para Carla e a ideia \"talvez\" descartada"; "no_action vira trecho descartado com motivo"; "instruções dentro do documento não viram ação"; "o texto não consegue fechar o bloco de dados"
@@ -81,7 +82,7 @@ Formato: arquivo — nome do teste.
 - `tests/activity-input.test.ts` — "bloqueada sem motivo efetivo gera erro"
 
 **9. Erro de fonte**
-- `tests/sync.test.ts` — "remoção e lixeira marcam a fonte como indisponível e apagam o cache"; "varredura completa detecta arquivo sumido sem evento de mudança"; "falha na varredura não marca nada como indisponível nem avança o token"; "falha transitória de download (HTTP 500) vira \"error\", não \"unavailable\""; "arquivo na lixeira (evento com trashed) vira indisponível"; "arquivo conhecido movido para fora da pasta vira indisponível"; "token revogado → estado auth_required"; "403 por limite de taxa (após as novas tentativas) vira \"error\" e mantém o cache; 403 de permissão vira \"unavailable\""; "a próxima varredura completa restaura o texto sem reanalisar nem criar sugestões"; "ata na lixeira e restaurada com o mesmo conteúdo não é reanalisada"
+- `tests/sync.test.ts` — "remoção e lixeira marcam a fonte como indisponível e apagam o cache"; "varredura completa detecta arquivo sumido sem evento de mudança"; "falha na varredura não marca nada como indisponível nem avança o token"; "falha transitória de download (HTTP 500) vira \"error\", não \"unavailable\""; "arquivo na lixeira (evento com trashed) vira indisponível"; "arquivo conhecido movido para fora da pasta vira indisponível"; "token revogado → estado auth_required"; "403 por limite de taxa (após as novas tentativas) vira \"error\" e mantém o cache; 403 de permissão vira \"unavailable\""; "403 por cota do Drive (diária, de download, de compartilhamento) vira \"error\" sem novas tentativas inúteis e mantém o cache"; "a próxima varredura completa restaura o texto sem reanalisar nem criar sugestões"; "ata na lixeira e restaurada com o mesmo conteúdo não é reanalisada"; "INDEX mudou no mesmo ciclo em que o texto foi apagado: as planilhas são reclassificadas, não só restauradas"; "ata que volta da lixeira depois de o INDEX marcá-la como superada vira histórico (não fica como ata)"
 - `tests/ingest.test.ts` — "markSourceUnavailable apaga o texto em cache"; "restoreExtractedText regrava só o texto, sem reclassificar nem reanalisar"; "analisar planilha sem texto em cache falha com mensagem clara (nunca \"0 sugestões\")"; "arquivo ilegível fica \"com erro\" (não vazio)"; "formato não suportado fica \"ignorado\" com motivo e versão registrada"
 - `tests/activities.test.ts` — "indica sugestão pendente e fonte indisponível"; "distingue fonte com erro de leitura de fonte indisponível"
 - `tests/digest.test.ts` — "incertezas: fonte indisponível e conflito de fonte"

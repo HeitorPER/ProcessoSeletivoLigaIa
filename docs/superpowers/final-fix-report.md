@@ -169,3 +169,31 @@ npm run build     → NÃO executado (instrução do brief: o servidor de desenv
 3. **Typecheck do commit `3b4eb2d`.** Esse commit, isolado, não passa no typecheck (estreitamento de `FetchedContent` no caminho de restauração). O conserto veio em `08632c7`. O HEAD está limpo.
 4. **Onde está este relatório.** O brief pedia `.superpowers/sdd/2026-10-03-central-liga-ia/final-fix-report.md`. Essa pasta é ignorada pelo git e não chega ao Windows, então o relatório foi commitado em `docs/superpowers/final-fix-report.md`. Uma cópia idêntica ficou em `.superpowers/...` no container.
 5. **`analysisError`.** Quando a análise lança exceção, `lib/suggestions/review-request.ts` continua devolvendo a mensagem genérica `ANALYSIS_FAILED_MESSAGE`, e não o texto "Texto da planilha indisponível…". O brief não pedia mudança aqui; o texto específico aparece no log do servidor.
+
+## Rodada de re-revisão (2026-10-04)
+
+Executada no Windows do usuário, em `feat/central-liga-ia` a partir de `0cbfad3`. Um commit por achado, cada um com teste primeiro (RED) e correção depois (GREEN).
+
+| Commit | Achado | RED (antes da correção) | GREEN |
+| --- | --- | --- | --- |
+| `1de16eb` | 1. Restauração sem reclassificar depois de mudar o `INDEX.md` (mesmo ciclo e entre ciclos) | `tests/sync.test.ts`: "INDEX mudou no mesmo ciclo…" → `expected 'activity_registry' not to be 'activity_registry'`; "ata que volta da lixeira…" → `kind: 'minutes'` em vez de `'deprecated'`. Só com a reclassificação, sem `restoredOnly`: `expected 1791125384939 to be greater than 1791125384939` (planilha restaurada não reavaliada) | `restoreExtractedText` reclassifica com o INDEX atual e devolve `null` se tipo, data da reunião ou aba do registro mudaram (o motor faz a ingestão completa). Restauração simples volta com `restoredOnly: true` e não entra em `ingestedAfterChange` |
+| `ed6b406` | 2. Regra 1 descartava a correção que a ata faz da própria proposta aceita | `tests/ingest.test.ts` "aceita sem ajuste: a correção da mesma ata vira sugestão pendente" → `expected false to be true` | Evento `suggestion_applied`/`create` de sugestão desta mesma ata com `reviewStatus: 'accepted'` não protege o campo; `adjusted` e edições diretas continuam protegidas (os dois testes de guarda passam) |
+| `ca06581` | 5. Ata sem data: corte na modificação da nova versão | "ata sem data: decisão humana depois da análise anterior continua protegida na reedição" → `expected true to be false` | Corte = `lastProcessedAt` anterior da fonte (lido antes de ser sobrescrito); na primeira análise, `meta.modifiedAt` |
+| `20dc363` | 3. Novidades com "antes" da foto gravada | `tests/digest.test.ts` → `expected 'prazo: 05/10/2026 → 07/10/2026' to contain 'prazo: 06/10/2026 → 07/10/2026'` | Pendente de atualização usa os valores atuais da atividade (`pickFields(toFields(target))`) |
+| `d37be49` | 4. 403 por cota virava "indisponível" e apagava o cache | `tests/sync.test.ts` (cota) → `dailyLimitExceeded: expected { … } to match object { errors: 1, unavailable: 0 }`; `tests/google-drive.test.ts` → `isRetryable(sharingRateLimitExceeded)` falso; `isInsideTree` com cota resolvia `null` | `sharingRateLimitExceeded` repetido; `dailyLimitExceeded`/`quotaExceeded`/`downloadQuotaExceeded` não repetidos, mas `isTemporaryDriveError` → "erro" com cache mantido; `isInsideTree` propaga o 403 passageiro |
+| `4751f0d` | 6. Conflito aceito sem texto virava beco sem saída | `tests/review-request.test.ts` → `expected { status: 200, … analysisError … } to deeply equal { status: 409, … }` | `reviewSuggestion` confere o texto antes de reivindicar; `source_unavailable` → HTTP 409 com a mensagem; a sugestão fica pendente. O `ReviewPanel` só trata 409 como "já revisada" quando o código não é `source_unavailable` |
+
+Ajustes de teste sem enfraquecer asserções: `tests/ingest.test.ts` usa `bad?.status` (o retorno de `restoreExtractedText` pode ser `null`); o teste "conflito de fonte: aceitar pede análise" de `tests/activities.test.ts` passou a gravar um texto em cache na fonte antes de aceitar (pré-condição nova).
+
+Decisões além do pedido: `downloadQuotaExceeded` entrou junto com as cotas pedidas (é o 403 típico de download de arquivo muito baixado); `isInsideTree` deixou de tratar 403 passageiro como "fora da pasta", pela mesma razão do achado 4.
+
+### Verificação final da re-revisão
+
+```
+npm test          → Test Files 16 passed (16) · Tests 222 passed (222)
+npm run typecheck → ✓ Types generated successfully; tsc --noEmit sem erros
+npm run lint      → eslint . sem erros
+npm run build     → NÃO executado (o servidor de desenvolvimento na porta 3000 usa .next)
+```
+
+Ressalva: a mudança no `ReviewPanel` (409 `source_unavailable` fica no cartão) não foi conferida no navegador, porque reproduzir o caso exigiria mexer em `prisma/dev.db`.

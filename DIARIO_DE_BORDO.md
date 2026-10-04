@@ -77,3 +77,15 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 - Documentação: pré-requisitos de instalação (acesso a `cdn.sheetjs.com`, build nativo do `better-sqlite3`, PowerShell 5.1 sem `&&`), avisos sobre os valores de exemplo do Google e do `TOKEN_ENC_KEY`, contagem de tentativas ("5 novas, 6 no total") e a seção 14 separando o achado de revisão de código (`7/10` × `17/10`) do caso observado (paráfrases do "próximo passo").
 
 **Como foi feito:** cada mudança de comportamento com teste primeiro (falhando), depois a correção (passando). Resultado: 16 arquivos e 212 testes passando; typecheck e lint sem erros. `npm run build` não foi executado nesta rodada.
+
+## 2026-10-04 — Re-revisão: decisões sobre restauração, regra 1, cotas e conflitos
+
+**O que a re-revisão encontrou e como decidi:**
+- **Restaurar texto não reavaliava a classificação.** Uma ata que voltava da lixeira depois de o `INDEX.md` marcá-la como superada continuava "ata", e uma planilha só restaurada no mesmo ciclo de uma mudança no `INDEX.md` escapava da reavaliação. Decisão: a restauração simples só vale quando a classificação atual (sem IA) é igual à gravada (tipo, data da reunião, aba do registro); senão, ingestão completa. Restauração simples não conta como reavaliação depois de mudar o `INDEX.md`.
+- **Regra 1 contra a própria ata.** Se Bruno aceita sem ajuste o prazo que a ata propôs e o autor depois corrige a ata, a correção era descartada como "decisão posterior". Decisão: aplicar sem ajuste uma sugestão vinda da mesma ata não protege o campo contra essa ata. Sugestão ajustada e edição manual continuam protegidas.
+- **Ata sem data.** O corte era a modificação da nova versão, que não protegia nada. Decisão: usar a análise anterior da ata (`lastProcessedAt`); na primeira análise, a modificação do arquivo.
+- **Novidades com "antes" antigo.** A proposta pendente agora compara com o valor oficial atual, como em `/sugestoes`.
+- **403 por cota.** `sharingRateLimitExceeded` é repetido como limite de taxa. `dailyLimitExceeded`, `quotaExceeded` e `downloadQuotaExceeded` não são repetidos na hora (a cota não volta em segundos), mas viram "erro" com o cache mantido, nunca "indisponível". Na subida pelos pais, esse 403 não vira "fora da pasta".
+- **Conflito aceito sem texto.** A revisão era registrada antes de a análise falhar e o conflito nunca voltava. Decisão: conferir o texto antes de registrar; sem ele, HTTP 409 com a mensagem "Texto da planilha indisponível — sincronize novamente antes de analisar" e o conflito continua pendente.
+
+**Como foi feito:** teste primeiro (falhando), depois a correção, um commit por achado. Resultado: 16 arquivos e 222 testes passando; typecheck e lint sem erros. `npm run build` não foi executado.
