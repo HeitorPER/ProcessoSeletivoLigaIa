@@ -50,6 +50,14 @@ describe('o que mudou para mim', () => {
     expect(davi.nothingChanged).toBe(true);
   });
 
+  it('proposta pendente compara com o valor oficial de agora, não com a foto do momento da sugestão', async () => {
+    await suggest();
+    await updateActivity('ACT-101', { dueDate: '2026-10-06' }, 'U-A');
+    const ana = await buildDigest('U-A', since, NOW);
+    expect(ana.pending).toHaveLength(1);
+    expect(ana.pending[0].detail).toContain('prazo: 06/10/2026 → 07/10/2026');
+  });
+
   it('após aprovação, Ana vê mudança confirmada com fonte; Davi não', async () => {
     const s = await suggest();
     await reviewSuggestion(s.id, 'U-B', { action: 'accept' });

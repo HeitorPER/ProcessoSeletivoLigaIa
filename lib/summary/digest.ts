@@ -1,4 +1,6 @@
 import type { AIProvider } from '@/lib/ai/types';
+import { pickFields } from '@/lib/activity-fields';
+import { toFields } from '@/lib/activities/fields';
 import { describeChanges, formatFieldValue } from '@/lib/activities/format';
 import { listActivities } from '@/lib/activities/queries';
 import { addDays, dueInfo, formatDateBR, formatDateTimeBR, todaySP } from '@/lib/dates';
@@ -65,7 +67,11 @@ export async function buildDigest(memberId: string, since: Date, now: Date = new
 
   const pending: DigestItem[] = [];
   const uncertain: DigestItem[] = [];
-  const suggestions = await prisma.suggestion.findMany({ where: { reviewStatus: 'pending' }, include: { source: true }, orderBy: { createdAt: 'desc' } });
+  const suggestions = await prisma.suggestion.findMany({
+    where: { reviewStatus: 'pending' },
+    include: { source: true, target: { include: { owners: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
   for (const s of suggestions) {
     const links = [{ label: 'Revisar sugestão', href: `/sugestoes#${s.id}`, external: false }, sourceLink(s.source.name, s.source.webUrl)];
     if (s.kind === 'source_conflict') {
@@ -77,9 +83,11 @@ export async function buildDigest(memberId: string, since: Date, now: Date = new
     if (!affects) continue;
     const keys = Object.keys(proposed) as (keyof ActivityFields)[];
     const uncertainties = parseJson<string[]>(s.uncertainties, []);
+    // pendente: compara com o oficial de agora (como em /sugestoes), não com a foto do momento da sugestão
+    const officialNow = s.target ? pickFields(toFields(s.target), keys) : parseJson<ActivityPatch>(s.currentSnapshot, {});
     const detail =
       s.kind === 'update'
-        ? describeChanges(parseJson<ActivityPatch>(s.currentSnapshot, {}), proposed, keys, members).join('; ')
+        ? describeChanges(officialNow, proposed, keys, members).join('; ')
         : `responsáveis: ${formatFieldValue('ownerIds', proposed.ownerIds, members)}; prazo: ${formatFieldValue('dueDate', proposed.dueDate, members)}`;
     const title = s.kind === 'create' ? `Nova atividade proposta: ${proposed.title ?? '(sem título)'}` : `${s.targetActivityId} · ${byId.get(s.targetActivityId!)?.title ?? ''}`;
     pending.push({ key: `suggestion-${s.id}`, title, detail, at: s.createdAt, tag: 'Aguardando revisão', links });
