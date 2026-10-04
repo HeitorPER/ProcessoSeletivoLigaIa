@@ -147,6 +147,7 @@ describe('revisão de sugestões', () => {
   });
   it('conflito de fonte: aceitar pede análise; rejeitar descarta', async () => {
     const s1 = await suggestion({ kind: 'source_conflict', targetActivityId: null, front: null, proposedFields: '{}' });
+    await prisma.source.update({ where: { fileId: 'ata03' }, data: { extractedText: 'texto em cache' } }); // aceitar exige o texto da planilha
     expect(await reviewSuggestion(s1.id, 'U-B', { action: 'accept' })).toMatchObject({ ok: true, followUp: 'analyze_sheet', sourceFileId: 'ata03' });
     const s2 = await suggestion({ kind: 'source_conflict', targetActivityId: null, front: null, proposedFields: '{}' });
     expect(await reviewSuggestion(s2.id, 'U-C', { action: 'reject', note: 'Planilha vazia sem autoridade' })).toMatchObject({ ok: true, status: 'rejected', followUp: null });

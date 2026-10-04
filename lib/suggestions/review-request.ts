@@ -20,7 +20,7 @@ const bodySchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('reject'), note: z.string() }),
 ]);
 
-const STATUS = { not_found: 404, already_reviewed: 409, forbidden: 403, invalid: 400 } as const;
+const STATUS = { not_found: 404, already_reviewed: 409, forbidden: 403, invalid: 400, source_unavailable: 409 } as const;
 
 export const ANALYSIS_FAILED_MESSAGE = 'A revisão foi registrada, mas a análise da planilha falhou; tente novamente mais tarde.';
 

@@ -1,5 +1,6 @@
 import { emptyFields } from '@/lib/activity-fields';
 import { prisma } from '@/lib/db';
+import { hasSheetText, SHEET_TEXT_UNAVAILABLE } from '@/lib/ingest/conflict';
 import { parseJson } from '@/lib/json';
 import { canReview, loadMembers } from '@/lib/members';
 import { REVIEW_STATUS_LABELS, type ActivityFields, type ActivityPatch, type ReviewStatus } from '@/lib/types';
@@ -8,7 +9,7 @@ import { createActivity, updateActivity, ValidationError } from './service';
 export type ReviewDecision = { action: 'accept' } | { action: 'adjust'; fields: ActivityPatch } | { action: 'reject'; note: string };
 export type ReviewResult =
   | { ok: true; status: ReviewStatus; activityId: string | null; followUp: 'analyze_sheet' | null; sourceFileId: string }
-  | { ok: false; error: 'not_found' | 'already_reviewed' | 'forbidden' | 'invalid'; message: string };
+  | { ok: false; error: 'not_found' | 'already_reviewed' | 'forbidden' | 'invalid' | 'source_unavailable'; message: string };
 
 type Failure = Extract<ReviewResult, { ok: false }>;
 const fail = (error: Failure['error'], message: string): ReviewResult => ({ ok: false, error, message });
@@ -26,6 +27,10 @@ export async function reviewSuggestion(suggestionId: string, reviewerId: string,
       if (!reviewer || !canReview(reviewer, s.front, members)) return fail('forbidden', 'Você não pode revisar sugestões desta frente');
       if (decision.action === 'reject' && !decision.note.trim()) return fail('invalid', 'Informe o motivo da rejeição');
       if (decision.action === 'adjust' && s.kind === 'source_conflict') return fail('invalid', 'Conflitos de fonte só podem ser aceitos (analisar) ou rejeitados (descartar)');
+      // Aceitar um conflito = analisar a planilha: sem o texto em cache, não registra a revisão (a sugestão não voltaria).
+      if (decision.action === 'accept' && s.kind === 'source_conflict' && !hasSheetText(await db.source.findUnique({ where: { fileId: s.sourceFileId } }))) {
+        return fail('source_unavailable', SHEET_TEXT_UNAVAILABLE);
+      }
 
       const status: ReviewStatus = decision.action === 'reject' ? 'rejected' : decision.action === 'adjust' ? 'adjusted' : 'accepted';
       const claimed = await db.suggestion.updateMany({

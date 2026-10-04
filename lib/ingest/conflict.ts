@@ -37,10 +37,17 @@ export async function registerSourceConflict(meta: SourceMeta, doc: SpreadsheetD
   return ok ? 1 : 0;
 }
 
+export const SHEET_TEXT_UNAVAILABLE = 'Texto da planilha indisponível — sincronize novamente antes de analisar';
+
+/** A planilha só pode ser analisada com o texto em cache e a fonte acessível. */
+export function hasSheetText(source: { extractedText: string | null; syncStatus: string } | null): source is { extractedText: string; syncStatus: string } {
+  return Boolean(source?.extractedText) && source!.syncStatus !== 'unavailable';
+}
+
 /** Chamado quando um revisor aceita um conflito de fonte: cada linha vira sugestão comum, nunca alteração direta. */
 export async function analyzeUnauthorizedSheet(fileId: string): Promise<number> {
   const source = await prisma.source.findUnique({ where: { fileId } });
-  if (!source?.extractedText || source.syncStatus === 'unavailable') throw new Error('Texto da planilha indisponível — sincronize novamente antes de analisar');
+  if (!source || !hasSheetText(source)) throw new Error(SHEET_TEXT_UNAVAILABLE);
   const doc = storedTextToDoc(source.extractedText);
   if (doc.kind !== 'spreadsheet') return 0;
   const members = await loadMembers();

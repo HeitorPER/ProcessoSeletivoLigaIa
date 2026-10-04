@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ACTIVITY_STATUSES, FRONTS, STATUS_LABELS, type ActivityPatch, type MemberInfo, type SuggestionKind } from '@/lib/types';
 
 type Mode = 'idle' | 'adjust' | 'reject';
-type ReviewBody = { error?: string; status?: string; analyzed?: number | null; analysisError?: string };
+type ReviewBody = { error?: string; code?: string; status?: string; analyzed?: number | null; analysisError?: string };
 const input = 'mt-1 block w-full rounded border border-line bg-white px-3 py-2';
 
 export function ReviewPanel({ id, kind, proposed, members }: { id: string; kind: SuggestionKind; proposed: ActivityPatch; members: MemberInfo[] }) {
@@ -37,7 +37,8 @@ export function ReviewPanel({ id, kind, proposed, members }: { id: string; kind:
       return;
     }
     const body = (await res.json().catch(() => null)) as ReviewBody | null;
-    if (res.status === 409) {
+    // 409 "já revisada" volta para a lista; 409 de texto da planilha indisponível fica no cartão com a mensagem.
+    if (res.status === 409 && body?.code !== 'source_unavailable') {
       router.push('/sugestoes?resultado=ja-revisada#lista');
       return;
     }

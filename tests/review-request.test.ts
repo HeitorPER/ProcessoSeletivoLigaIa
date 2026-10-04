@@ -92,6 +92,23 @@ describe('handleReviewRequest', () => {
       const r = await handleReviewRequest(id, 'U-B', { action: 'accept' });
       expect(r).toMatchObject({ status: 200, body: { ok: true, status: 'accepted', analyzed: 0 } });
     });
+    it('aceitar com o texto da planilha indisponível -> 409 sem registrar a revisão (a sugestão continua pendente)', async () => {
+      const id = await conflict();
+      const fileId = 'Ata - copia vazia.xlsx';
+      const unavailable = { status: 409, body: { error: 'Texto da planilha indisponível — sincronize novamente antes de analisar', code: 'source_unavailable' } };
+      await prisma.source.update({ where: { fileId }, data: { extractedText: null } });
+      expect((await handleReviewRequest(id, 'U-A', { action: 'accept' })).status).toBe(403);
+      expect(await handleReviewRequest(id, 'U-B', { action: 'accept' })).toEqual(unavailable);
+      expect((await prisma.suggestion.findUnique({ where: { id } }))!).toMatchObject({ reviewStatus: 'pending', reviewerId: null, reviewedAt: null });
+
+      const text = (await prisma.source.findUnique({ where: { fileId } }))!;
+      await prisma.source.update({ where: { fileId }, data: { extractedText: text.extractedText ?? 'x', syncStatus: 'unavailable' } });
+      expect(await handleReviewRequest(id, 'U-B', { action: 'accept' })).toEqual(unavailable);
+      expect((await prisma.suggestion.findUnique({ where: { id } }))!.reviewStatus).toBe('pending');
+
+      // rejeitar (descartar a planilha) não depende do texto
+      expect(await handleReviewRequest(id, 'U-B', { action: 'reject', note: 'Cópia antiga' })).toMatchObject({ status: 200, body: { status: 'rejected' } });
+    });
     it('falha na análise depois de registrar a revisão ainda responde 200 com aviso', async () => {
       const id = await conflict();
       analyzeFail.on = true;
