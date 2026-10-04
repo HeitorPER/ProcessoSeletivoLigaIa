@@ -95,6 +95,29 @@ describe('atas novas e editadas', () => {
     await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03', versionOrHash: 'v2' }), { format: 'markdown', text: `${ATA03}\n` }, ctx);
     expect(await pending()).toHaveLength(0);
   });
+  it('ata antiga reanalisada não propõe reverter decisão humana posterior (spec §3, regra 1)', async () => {
+    await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx);
+    const [s] = await pending();
+    expect(await reviewSuggestion(s.id, 'U-B', { action: 'accept' })).toMatchObject({ ok: true });
+    // a decisão vale depois do fim do dia da reunião de 01/10, independente do relógio
+    await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', type: 'suggestion_applied' }, data: { timestamp: new Date('2026-10-03T15:00:00Z') } });
+    expect((await prisma.activity.findUnique({ where: { id: 'ACT-101' } }))!.dueDate).toBe('2026-10-07');
+
+    const text = readFileSync(fx('01_CARGA_INICIAL/Ata_2026-10-01.md'), 'utf8').replace('Participaram Ana', 'Estiveram presentes Ana');
+    await ingestSource(metaFor('Ata_2026-10-01.md', { versionOrHash: 'v2' }), { format: 'markdown', text }, ctx);
+
+    const reverting = (await pendingFor('ACT-101')).filter((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-05');
+    expect(reverting).toHaveLength(0);
+    const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'Ata_2026-10-01.md', sourceVersion: 'v2' } });
+    expect(discarded.some((d) => d.reason === 'Decisão posterior já aprovada na Central para este campo — a ata não reverte o registro oficial' && d.excerpt.includes('ACT-101'))).toBe(true);
+  });
+  it('decisão humana anterior à reunião não bloqueia a proposta da ata', async () => {
+    await updateActivity('ACT-101', { dueDate: '2026-10-02' }, 'U-A');
+    await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', actorId: 'U-A' }, data: { timestamp: new Date('2026-09-30T15:00:00Z') } });
+    const text = readFileSync(fx('01_CARGA_INICIAL/Ata_2026-10-01.md'), 'utf8').replace('Participaram Ana', 'Estiveram presentes Ana');
+    await ingestSource(metaFor('Ata_2026-10-01.md', { versionOrHash: 'v2' }), { format: 'markdown', text }, ctx);
+    expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-05')).toBe(true);
+  });
   it('ata 04/10 gera criação para Carla e descarta a ideia "talvez"', async () => {
     await ingestSource(metaFor('Ata_2026-10-04.md'), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), ctx);
     const [s] = await pending();

@@ -12,6 +12,11 @@ export function todaySP(now: Date = new Date()): string {
   return toIsoDateSP(now);
 }
 
+/** Último instante do dia AAAA-MM-DD em São Paulo (UTC−3 o ano todo desde 2019, sem horário de verão). */
+export function endOfDaySP(iso: string): Date {
+  return new Date(`${iso}T23:59:59.999-03:00`);
+}
+
 export function isIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
