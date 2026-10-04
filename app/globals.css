@@ -241,6 +241,77 @@ header :where(a, button, select):focus-visible {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23a3a9b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
+/*
+ * Lista de opções no mesmo estilo dos cards (select personalizável nativo). Continua sendo o <select> real:
+ * teclado, leitor de tela e formulários funcionam igual. Sem suporte, vale o select acima com a lista do sistema.
+ */
+@supports (appearance: base-select) {
+  select.field,
+  select.field::picker(select) {
+    appearance: base-select;
+  }
+  select.field,
+  :root[data-theme="dark"] select.field {
+    background-image: none;
+    padding-right: 0.875rem;
+    /* Fora das camadas do Tailwind: vence o utilitário "block" e mantém a seta na mesma linha do texto. */
+    display: flex;
+    white-space: nowrap;
+    overflow: hidden;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) select.field {
+      background-image: none;
+    }
+  }
+  select.field::picker-icon {
+    content: "";
+    width: 12px;
+    height: 8px;
+    background-color: var(--color-muted);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+    transition: rotate 150ms ease;
+  }
+  select.field:open::picker-icon {
+    rotate: 180deg;
+  }
+  select.field::picker(select) {
+    margin-block: 0.375rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: 1rem;
+    background: var(--color-panel);
+    color: var(--color-ink);
+    padding: 0.375rem;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.08), 0 12px 32px rgb(0 0 0 / 0.14);
+    min-width: anchor-size(width);
+  }
+  select.field option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+  }
+  select.field option::checkmark {
+    color: var(--color-brand);
+  }
+  select.field option:hover,
+  select.field option:focus-visible {
+    background: var(--color-tint);
+    outline: none;
+    box-shadow: none;
+  }
+  select.field option:checked {
+    background: var(--color-brand-soft);
+    color: var(--color-brand);
+    font-weight: 600;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
