@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { getProvider } from '@/lib/ai';
-import { createOpenAIProvider } from '@/lib/ai/openai';
+import { createOpenAIProvider, OPENAI_CLIENT_OPTIONS } from '@/lib/ai/openai';
 import { buildExtractionUserPrompt, EXTRACTION_SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { extractByRules } from '@/lib/ai/rules';
-import type { ExtractionInput, RawExtractionItem } from '@/lib/ai/types';
+import { AIError, type ExtractionInput, type RawExtractionItem } from '@/lib/ai/types';
 import { dateMentioned, evidenceIsLiteral, validateItems } from '@/lib/ai/validate';
 import type { ActivitySnapshot, MemberInfo } from '@/lib/types';
 
@@ -195,6 +195,18 @@ describe('provedor OpenAI', () => {
     await expect(mk({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output_text: '', output: [] }).extract(input(ATA03))).rejects.toThrow(/incompleta/);
     await expect(mk({ status: 'completed', output_text: '', output: [{ type: 'message', content: [{ type: 'refusal', refusal: 'não posso' }] }] }).extract(input(ATA03))).rejects.toThrow(/recusou/);
     await expect(mk({ status: 'completed', output_text: '{oops', output: [] }).extract(input(ATA03))).rejects.toThrow(/JSON/);
+  });
+  it('falha do SDK vira AIError em português, sem expor a chave', async () => {
+    const create = vi.fn().mockRejectedValue(new Error('Request timed out. key=sk-segredo-123'));
+    const p = createOpenAIProvider({ apiKey: 'sk-segredo-123', model: 'm', client: { responses: { create } } });
+    const err = await p.extract(input(ATA03)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AIError);
+    expect((err as Error).message).toMatch(/^Falha ao chamar o modelo: Request timed out/);
+    expect((err as Error).message).not.toContain('sk-segredo-123');
+    await expect(p.summarize('fatos')).rejects.toBeInstanceOf(AIError);
+  });
+  it('cliente OpenAI com tempo limite de 60 s e uma nova tentativa', () => {
+    expect(OPENAI_CLIENT_OPTIONS).toEqual({ timeout: 60_000, maxRetries: 1 });
   });
   it('summarize usa esforço "none" e devolve texto', async () => {
     const create = vi.fn().mockResolvedValue({ status: 'completed', output_text: '  Resumo.  ', output: [] });

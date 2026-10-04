@@ -20,12 +20,25 @@ function findRefusal(response: ResponseLike): string | null {
   return null;
 }
 
+/** 60 s por chamada e uma única nova tentativa: o ciclo de sincronização não fica preso esperando o modelo. */
+export const OPENAI_CLIENT_OPTIONS = { timeout: 60_000, maxRetries: 1 } as const;
+
 export function createOpenAIProvider(opts: { apiKey: string; model: string; client?: ResponsesClient }): AIProvider {
-  const client: ResponsesClient = opts.client ?? (new OpenAI({ apiKey: opts.apiKey }) as unknown as ResponsesClient);
+  const client: ResponsesClient = opts.client ?? (new OpenAI({ apiKey: opts.apiKey, ...OPENAI_CLIENT_OPTIONS }) as unknown as ResponsesClient);
+  /** Erros do SDK (rede, tempo limite, HTTP) viram AIError em português; a chave nunca aparece na mensagem. */
+  async function call(body: Record<string, unknown>): Promise<ResponseLike> {
+    try {
+      return await client.responses.create(body);
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const safe = opts.apiKey ? raw.split(opts.apiKey).join('[chave omitida]') : raw;
+      throw new AIError(`Falha ao chamar o modelo: ${safe}`);
+    }
+  }
   return {
     name: `openai:${opts.model}`,
     async extract(input) {
-      const response = await client.responses.create({
+      const response = await call({
         model: opts.model,
         reasoning: { effort: 'low' },
         instructions: EXTRACTION_SYSTEM_PROMPT,
@@ -48,7 +61,7 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string; clie
       return result.data.items;
     },
     async summarize(facts) {
-      const response = await client.responses.create({
+      const response = await call({
         model: opts.model,
         reasoning: { effort: 'none' },
         instructions: SUMMARY_SYSTEM_PROMPT,
