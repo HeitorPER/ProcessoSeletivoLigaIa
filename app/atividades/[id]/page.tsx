@@ -35,7 +35,12 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
           <ul className="mt-1 list-disc pl-5">{a.pending.map((p) => <li key={p.id}>De <SourceLink name={p.sourceName} href={p.sourceUrl} />: “{p.evidence.replace(/\*\*/g, '')}”</li>)}</ul>
         </Notice>
       )}
-      {a.hasStaleSource && <Notice tone="warn" title="Fonte indisponível">Uma fonte desta atividade foi removida ou perdeu acesso. Os dados confirmados abaixo podem estar desatualizados.</Notice>}
+      {a.hasStaleSource &&
+        (a.staleReason === 'error' ? (
+          <Notice tone="warn" title="Fonte com erro de leitura">Fonte com erro de leitura — dado pode estar desatualizado. A sincronização tenta ler o arquivo de novo na próxima varredura completa.</Notice>
+        ) : (
+          <Notice tone="warn" title="Fonte indisponível">Uma fonte desta atividade foi removida ou perdeu acesso. Os dados confirmados abaixo podem estar desatualizados.</Notice>
+        ))}
 
       <dl className="grid max-w-3xl grid-cols-1 gap-x-6 sm:grid-cols-[12rem_1fr]">
         {row('Responsáveis', a.owners.length ? a.owners.map((o) => o.displayName).join(', ') : <span className="italic text-muted">Responsável a confirmar</span>)}

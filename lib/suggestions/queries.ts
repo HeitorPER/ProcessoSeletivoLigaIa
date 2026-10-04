@@ -1,7 +1,9 @@
+import { pickFields } from '@/lib/activity-fields';
+import { toFields } from '@/lib/activities/fields';
 import { prisma } from '@/lib/db';
 import { parseJson } from '@/lib/json';
 import { canReview, loadMembers, reviewersFor } from '@/lib/members';
-import type { ActivityPatch, MemberInfo, ReviewStatus, SourceMetaJson, SuggestionKind } from '@/lib/types';
+import type { ActivityFields, ActivityPatch, MemberInfo, ReviewStatus, SourceMetaJson, SuggestionKind } from '@/lib/types';
 
 export interface SuggestionView {
   id: string;
@@ -31,40 +33,48 @@ export async function listSuggestions(group: 'pending' | 'reviewed', viewer: Mem
   const members = await loadMembers();
   const rows = await prisma.suggestion.findMany({
     where: group === 'pending' ? { reviewStatus: 'pending' } : { NOT: { reviewStatus: 'pending' } },
-    include: { source: true, target: true },
+    include: { source: true, target: { include: { owners: true } } },
     orderBy: group === 'pending' ? { createdAt: 'desc' } : { reviewedAt: 'desc' },
     take: group === 'pending' ? undefined : 50,
   });
-  return rows.map((s) => ({
-    id: s.id,
-    kind: s.kind as SuggestionKind,
-    reviewStatus: s.reviewStatus as ReviewStatus,
-    targetActivityId: s.targetActivityId,
-    targetTitle: s.target?.title ?? null,
-    proposedId: s.proposedId,
-    proposedFields: parseJson<ActivityPatch>(s.proposedFields, {}),
-    currentSnapshot: parseJson<ActivityPatch>(s.currentSnapshot, {}),
-    evidence: s.evidence,
-    evidenceLocator: s.evidenceLocator,
-    reason: s.reason,
-    uncertainties: parseJson<string[]>(s.uncertainties, []),
-    front: s.front,
-    createdAt: s.createdAt,
-    reviewedAt: s.reviewedAt,
-    reviewNote: s.reviewNote,
-    reviewerName: s.reviewerId ? (members.find((m) => m.id === s.reviewerId)?.displayName ?? s.reviewerId) : null,
-    resultActivityId: s.resultActivityId,
-    source: {
-      fileId: s.source.fileId,
-      name: s.source.name,
-      webUrl: s.source.webUrl,
-      syncStatus: s.source.syncStatus,
-      documentDate: parseJson<SourceMetaJson>(s.source.meta, {}).meetingDate ?? null,
-      modifiedAt: s.source.modifiedAt,
-    },
-    canReview: canReview(viewer, s.front, members),
-    reviewerNames: reviewersFor(s.front, members).map((m) => m.displayName),
-  }));
+  /** Pendente de atualização compara com o oficial de agora; revisada mantém a foto do momento da sugestão. */
+  const officialNow = (s: (typeof rows)[number], proposed: ActivityPatch): ActivityPatch =>
+    s.reviewStatus === 'pending' && s.kind === 'update' && s.target
+      ? pickFields(toFields(s.target), Object.keys(proposed) as (keyof ActivityFields)[])
+      : parseJson<ActivityPatch>(s.currentSnapshot, {});
+  return rows.map((s) => {
+    const proposedFields = parseJson<ActivityPatch>(s.proposedFields, {});
+    return {
+      id: s.id,
+      kind: s.kind as SuggestionKind,
+      reviewStatus: s.reviewStatus as ReviewStatus,
+      targetActivityId: s.targetActivityId,
+      targetTitle: s.target?.title ?? null,
+      proposedId: s.proposedId,
+      proposedFields,
+      currentSnapshot: officialNow(s, proposedFields),
+      evidence: s.evidence,
+      evidenceLocator: s.evidenceLocator,
+      reason: s.reason,
+      uncertainties: parseJson<string[]>(s.uncertainties, []),
+      front: s.front,
+      createdAt: s.createdAt,
+      reviewedAt: s.reviewedAt,
+      reviewNote: s.reviewNote,
+      reviewerName: s.reviewerId ? (members.find((m) => m.id === s.reviewerId)?.displayName ?? s.reviewerId) : null,
+      resultActivityId: s.resultActivityId,
+      source: {
+        fileId: s.source.fileId,
+        name: s.source.name,
+        webUrl: s.source.webUrl,
+        syncStatus: s.source.syncStatus,
+        documentDate: parseJson<SourceMetaJson>(s.source.meta, {}).meetingDate ?? null,
+        modifiedAt: s.source.modifiedAt,
+      },
+      canReview: canReview(viewer, s.front, members),
+      reviewerNames: reviewersFor(s.front, members).map((m) => m.displayName),
+    };
+  });
 }
 
 export async function listDiscarded(limit = 30) {
