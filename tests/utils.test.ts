@@ -3,6 +3,7 @@ import { parseJson, stableStringify } from '@/lib/json';
 import { jaccard, normalizeForMatch, normalizeName, textSimilar, tokenize, truncate } from '@/lib/text';
 import { addDays, daysBetween, dueInfo, endOfDaySP, formatDateBR, isIsoDate, toIsoDateSP, todaySP } from '@/lib/dates';
 import { diffFields, emptyFields, pickFields, sameFieldValue } from '@/lib/activity-fields';
+import { sqliteSidecarFiles } from '@/lib/db-url';
 
 describe('activity-fields', () => {
   it('diffFields é estrito (registra qualquer edição)', () => {
@@ -87,5 +88,12 @@ describe('dates', () => {
     expect(dueInfo('2026-10-05', '2026-10-03')).toEqual({ label: 'Vence em 2 dias', tone: 'soon' });
     expect(dueInfo('2026-10-04', '2026-10-03')).toEqual({ label: 'Vence amanhã', tone: 'soon' });
     expect(dueInfo('2026-10-20', '2026-10-03')).toEqual({ label: 'Vence em 17 dias', tone: 'ok' });
+  });
+});
+
+describe('db-url', () => {
+  it('sqliteSidecarFiles: arquivos -wal, -shm e -journal do banco SQLite, para apagar junto no reset', () => {
+    expect(sqliteSidecarFiles('file:/tmp/x/dev.db')).toEqual(['/tmp/x/dev.db-wal', '/tmp/x/dev.db-shm', '/tmp/x/dev.db-journal']);
+    expect(sqliteSidecarFiles('postgres://localhost/db')).toEqual([]);
   });
 });

@@ -109,7 +109,7 @@ Outros comandos:
 | `npm run build` e `npm start` | Build de produção e execução (também sobe o worker) |
 | `npm test` | Testes automatizados |
 | `npm run typecheck` / `npm run lint` | Tipos e lint |
-| `npm run db:reset` | Apaga e recria o banco. O Prisma bloqueia esse comando quando executado por agentes de IA; rode-o você mesmo em um terminal. Alternativa: apagar `prisma/dev.db` e rodar `npm run setup` |
+| `npm run db:reset` | Apaga e recria o banco. Pare o `npm run dev` antes (Ctrl+C). Remove também os arquivos `prisma/dev.db-wal` e `prisma/dev.db-shm` de execuções anteriores, que corromperiam o banco novo ("database disk image is malformed"). O Prisma bloqueia esse comando quando executado por agentes de IA; rode-o você mesmo em um terminal. Alternativa: apagar `prisma/dev.db`, `prisma/dev.db-wal` e `prisma/dev.db-shm` e rodar `npm run setup` |
 
 Variáveis do `.env` (nenhum valor real deve ser versionado; `.env` está no `.gitignore`):
 

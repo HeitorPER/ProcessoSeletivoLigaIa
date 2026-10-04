@@ -15,7 +15,7 @@
     "setup": "prisma migrate deploy && prisma db seed",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset --force && prisma db seed",
+    "db:reset": "tsx prisma/clean-db-files.ts && prisma migrate reset --force && prisma db seed",
     "postinstall": "prisma generate"
   },
   "dependencies": {
