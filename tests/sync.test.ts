@@ -264,6 +264,59 @@ describe('ciclo de sincronização', () => {
     expect(r.processed + r.ignored + r.errors + r.unavailable + r.unchanged).toBe(9);
   });
 
+  describe('texto em cache apagado (desconectar e reconectar)', () => {
+    const counting = () => {
+      const base = createRuleBasedProvider();
+      const calls = { extract: 0 };
+      return { calls, provider: { ...base, extract: (...args: Parameters<typeof base.extract>) => { calls.extract++; return base.extract(...args); } } };
+    };
+
+    it('a próxima varredura completa restaura o texto sem reanalisar nem criar sugestões', async () => {
+      drive.add(file('ata04', 'Ata_2026-10-04.md', fx('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), { parents: ['sub'] }));
+      drive.change('ata04');
+      await runCycle(depsFor(drive), 'incremental');
+      const suggestionsBefore = await prisma.suggestion.findMany({ orderBy: { id: 'asc' } });
+      expect(suggestionsBefore).toHaveLength(1);
+
+      await prisma.source.updateMany({ data: { extractedText: null } }); // mesmo efeito de disconnectGoogle
+      const { calls, provider } = counting();
+      const r = await runCycle({ ...depsFor(drive), provider }, 'full');
+
+      expect(r).toMatchObject({ processed: 7, errors: 0, unavailable: 0, unchanged: 2 });
+      for (const id of ['ESTADO-ATUAL.md', 'GUIA_INICIAL.md', 'Ata_2026-10-01.md', 'ata04', 'reg']) {
+        const src = await prisma.source.findUnique({ where: { fileId: id } });
+        expect(src!.extractedText, id).toBeTruthy();
+        expect(src!.syncStatus, id).toBe('processed');
+      }
+      expect((await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } }))!.extractedText).toContain('#');
+      expect((await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } }))!.statusReason).toContain('origem');
+      expect(calls.extract).toBe(0);
+      expect(await prisma.suggestion.findMany({ orderBy: { id: 'asc' } })).toEqual(suggestionsBefore);
+      expect(await prisma.suggestion.count({ where: { reviewStatus: 'superseded' } })).toBe(0);
+
+      // depois de restaurado, o ciclo seguinte volta a ser "sem mudança"
+      expect(await runCycle({ ...depsFor(drive), provider }, 'full')).toMatchObject({ processed: 0, unchanged: 9 });
+    });
+
+    it('ata na lixeira e restaurada com o mesmo conteúdo não é reanalisada', async () => {
+      const ata01 = drive.files.get('Ata_2026-10-01.md')!;
+      drive.add({ ...ata01, trashed: true });
+      drive.change('Ata_2026-10-01.md');
+      expect((await runCycle(depsFor(drive), 'incremental')).unavailable).toBe(1);
+
+      drive.add({ ...ata01, trashed: false });
+      drive.change('Ata_2026-10-01.md');
+      const { calls, provider } = counting();
+      const r = await runCycle({ ...depsFor(drive), provider }, 'incremental');
+      expect(r).toMatchObject({ processed: 1, errors: 0 });
+      const src = await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } });
+      expect(src).toMatchObject({ syncStatus: 'processed', kind: 'minutes' });
+      expect(src!.extractedText).toContain('ACT-101');
+      expect(calls.extract).toBe(0);
+      expect(await prisma.suggestion.count()).toBe(0);
+    });
+  });
+
   it('ciclos concorrentes: o segundo é ignorado pelo lock', async () => {
     await prisma.syncState.update({ where: { id: 1 }, data: { runningSince: new Date() } });
     expect(await runCycle(depsFor(drive), 'incremental')).toMatchObject({ skipped: 'locked' });

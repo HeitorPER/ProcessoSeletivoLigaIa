@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { isInsideTree, walkTree, type DriveFileWithPath } from '@/lib/drive/tree';
 import { DriveError, FOLDER_MIME, GSHEET_MIME, XLSX_MIME, type DriveApi } from '@/lib/drive/types';
 import { isIndexFile } from '@/lib/authority/classify';
-import { ingestSource, markSourceUnavailable, mergeSourceMeta, upsertSourceMeta, type IngestOutcome } from '@/lib/ingest';
+import { ingestSource, markSourceUnavailable, mergeSourceMeta, restoreExtractedText, upsertSourceMeta, type IngestOutcome } from '@/lib/ingest';
 import { parseJson } from '@/lib/json';
 import type { FetchedContent, SourceMetaJson } from '@/lib/types';
 import { fetchContent } from './fetch';
@@ -60,7 +60,9 @@ function priority(f: DriveFileWithPath): number {
 async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = false): Promise<FileResult> {
   const existing = await prisma.source.findUnique({ where: { fileId: file.id } });
   const revision = driveRevision(file);
-  const healthy = Boolean(existing && existing.syncStatus !== 'error' && existing.syncStatus !== 'unavailable');
+  // Sem texto em cache (conta desconectada, arquivo que voltou da lixeira) a fonte precisa ser lida de novo.
+  const textMissing = Boolean(existing && existing.kind !== 'unsupported' && existing.extractedText === null);
+  const healthy = Boolean(existing && existing.syncStatus !== 'error' && existing.syncStatus !== 'unavailable') && !textMissing;
 
   if (!force && healthy && parseJson<SourceMetaJson>(existing!.meta, {}).driveRevision === revision) {
     if (existing!.name !== file.name || existing!.path !== file.path) await upsertSourceMeta(toSourceMeta(file, existing!.versionOrHash));
@@ -85,6 +87,15 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
     await upsertSourceMeta(toSourceMeta(file, hash));
     await mergeSourceMeta(file.id, { driveRevision: revision });
     return 'unchanged';
+  }
+  // Mesmo conteúdo já analisado, só faltando o texto: restaura o cache sem reanalisar (nada de sugestões repetidas).
+  const restorable = existing && existing.processedVersion === hash && content.format !== 'unsupported'
+    && (existing.syncStatus === 'unavailable' || (existing.syncStatus === 'processed' && textMissing));
+  if (!force && restorable) {
+    const reason = existing.syncStatus === 'unavailable' ? 'Arquivo acessível de novo, com o mesmo conteúdo já analisado — texto restaurado sem nova análise' : undefined;
+    const restored = await restoreExtractedText(toSourceMeta(file, hash), content, reason);
+    if (restored.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });
+    return restored;
   }
   const outcome = await ingestSource(toSourceMeta(file, hash), content, { provider: deps.provider });
   if (outcome.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });

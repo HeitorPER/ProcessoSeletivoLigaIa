@@ -44,6 +44,32 @@ export async function ingestSource(meta: SourceMeta, content: FetchedContent, ct
   return ingestExtracted(meta, doc, ctx);
 }
 
+/**
+ * Conteúdo idêntico ao já analisado (`processedVersion`), mas sem texto em cache — depois de desconectar
+ * a conta ou de o arquivo voltar da lixeira. Só extrai e regrava o texto: não reclassifica, não reanalisa
+ * e não cria nem substitui sugestões. `statusReason` substitui o motivo atual quando informado.
+ */
+export async function restoreExtractedText(meta: SourceMeta, content: Exclude<FetchedContent, { format: 'unsupported' }>, statusReason?: string): Promise<IngestOutcome> {
+  const existing = await prisma.source.findUnique({ where: { fileId: meta.fileId } });
+  await upsertSourceMeta(meta);
+  let doc: ExtractedDoc;
+  try {
+    doc = await extractDoc(content);
+  } catch (e) {
+    const reason = `Não foi possível ler o arquivo: ${(e as Error).message}`;
+    await prisma.source.update({ where: { fileId: meta.fileId }, data: { syncStatus: 'error', statusReason: reason } });
+    return { status: 'error', kind: null, reason, suggestionsCreated: 0, authorityChanged: false };
+  }
+  const metaJson = parseJson<SourceMetaJson>(existing?.meta, {});
+  if (doc.kind === 'markdown') metaJson.frontMatter = doc.frontMatter;
+  const reason = statusReason ?? existing?.statusReason ?? 'Texto restaurado';
+  await prisma.source.update({
+    where: { fileId: meta.fileId },
+    data: { syncStatus: 'processed', statusReason: reason, extractedText: docToStoredText(doc), meta: JSON.stringify(metaJson) },
+  });
+  return { status: 'processed', kind: (existing?.kind as SourceKind | undefined) ?? null, reason, suggestionsCreated: 0, authorityChanged: false };
+}
+
 export async function ingestExtracted(meta: SourceMeta, doc: ExtractedDoc, ctx: IngestContext): Promise<IngestOutcome> {
   const existing = await prisma.source.findUnique({ where: { fileId: meta.fileId } });
   await upsertSourceMeta(meta);
