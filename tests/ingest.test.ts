@@ -166,6 +166,13 @@ describe('atas novas e editadas', () => {
     expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-07')).toBe(false);
     const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata-sem-data', sourceVersion: 'v2' } });
     expect(discarded.some((d) => d.reason === LATER_DECISION_REASON && d.excerpt.includes('ACT-101'))).toBe(true);
+
+    // uma segunda reedição continua sem reverter: o corte não avança a cada nova análise
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await ingestSource(m('v3', new Date()), { format: 'markdown', text: semData.replace('Participaram Ana', 'Presentes: Ana') }, ctx);
+    expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-07')).toBe(false);
+    const discardedV3 = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata-sem-data', sourceVersion: 'v3' } });
+    expect(discardedV3.some((d) => d.reason === LATER_DECISION_REASON && d.excerpt.includes('ACT-101'))).toBe(true);
   });
   it('decisão humana anterior à reunião não bloqueia a proposta da ata', async () => {
     await updateActivity('ACT-101', { dueDate: '2026-10-02' }, 'U-A');

@@ -26,7 +26,7 @@ export const LATER_DECISION_REASON = 'Decisão posterior já aprovada na Central
 /**
  * Spec §3, regra 1: decisão humana aprovada na Central vale mais que a proposta de uma ata.
  * Remove das sugestões de atualização os campos que alguém decidiu na Central depois do corte
- * (fim do dia da reunião em São Paulo; sem data, a análise anterior desta ata ou, na primeira, a última modificação do arquivo).
+ * (fim do dia da reunião em São Paulo; sem data, quando a Central viu esta ata pela primeira vez ou, na primeira análise, a última modificação do arquivo).
  * Exceção: aplicar sem ajuste uma sugestão vinda desta mesma ata não protege o campo contra a
  * correção da própria ata (o revisor aprovou o que a ata dizia, não decidiu outro valor).
  * Sugestão ajustada pelo revisor e edição humana direta continuam protegidas.
@@ -71,8 +71,8 @@ async function dropRevertsOfLaterDecisions(
 }
 
 /**
- * `previousAnalysisAt`: quando esta ata foi analisada pela última vez (antes desta versão). Sem data da reunião,
- * é o corte da regra 1; na primeira análise, vale a data de modificação do arquivo.
+ * `firstAnalysisAt`: quando a Central viu esta ata pela primeira vez (só se ela já foi analisada). Sem data da reunião,
+ * é o corte da regra 1 e não avança a cada reedição; na primeira análise, vale a data de modificação do arquivo.
  */
 export async function processMinutes(
   meta: SourceMeta,
@@ -80,7 +80,7 @@ export async function processMinutes(
   meetingDate: string | null,
   provider: AIProvider,
   firstTime: boolean,
-  previousAnalysisAt: Date | null = null,
+  firstAnalysisAt: Date | null = null,
 ): Promise<{ created: number; note: string | null }> {
   // Sem a importação inicial da planilha não dá para saber quais atas já foram consolidadas nela: tenta de novo depois.
   const state = await getSyncState();
@@ -103,7 +103,7 @@ export async function processMinutes(
   const [activities, members] = await Promise.all([listActivitySnapshots(), loadMembers()]);
   const items = await provider.extract({ documentName: meta.name, meetingDate, text: doc.text, activities, members });
   const result = validateItems(items, { text: doc.text, sections: doc.sections, activities, members });
-  const cutoff = meetingDate ? endOfDaySP(meetingDate) : (previousAnalysisAt ?? meta.modifiedAt);
+  const cutoff = meetingDate ? endOfDaySP(meetingDate) : (firstAnalysisAt ?? meta.modifiedAt);
   const { kept, discarded } = await dropRevertsOfLaterDecisions(result.suggestions, meta.fileId, cutoff, members);
   // Só substitui as sugestões da versão antiga depois que a nova análise deu certo.
   await supersedePending(meta.fileId, meta.versionOrHash);

@@ -197,3 +197,12 @@ npm run build     → NÃO executado (o servidor de desenvolvimento na porta 300
 ```
 
 Ressalva: a mudança no `ReviewPanel` (409 `source_unavailable` fica no cartão) não foi conferida no navegador, porque reproduzir o caso exigiria mexer em `prisma/dev.db`.
+
+### Segunda re-revisão (`0cbfad3..a9847dd`)
+
+Veredito: **pronto**, sem regressões. Dois pontos restantes:
+
+- **Ata sem data: a proteção valia só uma reedição** (corrigido). Com o corte em `lastProcessedAt`, a análise seguinte avançava o corte para depois da decisão humana, e a terceira versão voltava a propor a reversão. RED: "ata sem data…" com uma segunda reedição (v3) → `expected true to be false`. GREEN: o corte passou a ser `firstSeenAt` da fonte (fixo depois da primeira análise); na primeira análise continua `meta.modifiedAt`.
+- **Janela de milissegundos no conflito aceito** (aceito como limitação). O texto da planilha é conferido dentro da transação, mas a análise roda depois do commit. Se "Desconectar" ou uma sincronização apagar o cache exatamente nesse intervalo, o conflito fica aceito com `analysisError`. A janela é de milissegundos, depende de duas ações simultâneas, e o resultado é visível na tela e no log.
+
+Verificação: `npm test` 222 testes passando; typecheck e lint sem erros.
