@@ -11,7 +11,7 @@ export function parseIndex(doc: MarkdownDoc): AuthorityConfig {
       const sheetFile = quoted.find((f) => /\.(xlsx|xls)$/i.test(f)) ?? /([\w .-]+\.xlsx)/i.exec(line)?.[1]?.trim();
       if (sheetFile) {
         registryFileName = sheetFile;
-        registrySheet = /aba\s+[`"“]([^`"”]+)[`"”]/i.exec(line)?.[1]?.trim() ?? null;
+        registrySheet = /aba\s+[`"\u201C]([^`"\u201D]+)[`"\u201D]/i.exec(line)?.[1]?.trim() ?? null;
       }
     }
     for (const m of line.matchAll(/`([^`]+)`\s+(?:foi\s+)?(?:superado|substitu[íi]do|descontinuado)/gi)) {

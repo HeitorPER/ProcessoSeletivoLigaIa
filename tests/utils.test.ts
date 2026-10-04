@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseJson, stableStringify } from '@/lib/json';
 import { jaccard, normalizeForMatch, normalizeName, textSimilar, tokenize, truncate } from '@/lib/text';
-import { addDays, daysBetween, dueInfo, formatDateBR, isIsoDate, toIsoDateSP, todaySP } from '@/lib/dates';
+import { addDays, daysBetween, dueInfo, endOfDaySP, formatDateBR, isIsoDate, toIsoDateSP, todaySP } from '@/lib/dates';
 import { diffFields, emptyFields, pickFields, sameFieldValue } from '@/lib/activity-fields';
 
 describe('activity-fields', () => {
@@ -60,6 +60,10 @@ describe('text', () => {
 });
 
 describe('dates', () => {
+  it('endOfDaySP: último instante do dia em São Paulo', () => {
+    expect(endOfDaySP('2026-10-01').toISOString()).toBe('2026-10-02T02:59:59.999Z');
+    expect(toIsoDateSP(endOfDaySP('2026-10-01'))).toBe('2026-10-01');
+  });
   it('isIsoDate valida formato e data real', () => {
     expect(isIsoDate('2026-10-07')).toBe(true);
     expect(isIsoDate('2026-02-30')).toBe(false);

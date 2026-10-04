@@ -16,7 +16,12 @@ function Flags({ a }: { a: ActivityListItem }) {
           <span aria-hidden="true">↻ </span>Atualização proposta pendente ({a.pendingSuggestions})
         </Link>
       )}
-      {a.hasStaleSource && <span className="mt-1 block text-sm font-medium text-warn"><span aria-hidden="true">▲ </span>Fonte indisponível — dado pode estar desatualizado</span>}
+      {a.hasStaleSource && (
+        <span className="mt-1 block text-sm font-medium text-warn">
+          <span aria-hidden="true">▲ </span>
+          {a.staleReason === 'error' ? 'Fonte com erro de leitura — dado pode estar desatualizado' : 'Fonte indisponível — dado pode estar desatualizado'}
+        </span>
+      )}
     </>
   );
 }

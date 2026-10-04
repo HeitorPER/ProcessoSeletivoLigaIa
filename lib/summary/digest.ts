@@ -92,9 +92,10 @@ export async function buildDigest(memberId: string, since: Date, now: Date = new
     if (a.status === 'done') continue;
     if (a.hasStaleSource) {
       const stale = a.sources.filter((x) => x.syncStatus !== 'processed' && x.syncStatus !== 'ignored');
+      const label = a.staleReason === 'error' ? 'Fonte com erro de leitura' : 'Fonte indisponível';
       uncertain.push({
-        key: `stale-${a.id}`, title: `${a.id} · ${a.title}`, at: a.updatedAt, tag: 'Fonte indisponível',
-        detail: `Fonte indisponível (${stale.map((x) => x.name).join(', ')}): o dado confirmado em ${formatDateTimeBR(a.updatedAt)} pode estar desatualizado`,
+        key: `stale-${a.id}`, title: `${a.id} · ${a.title}`, at: a.updatedAt, tag: label,
+        detail: `${label} (${stale.map((x) => x.name).join(', ')}): o dado confirmado em ${formatDateTimeBR(a.updatedAt)} pode estar desatualizado`,
         links: [activityLink(a.id)],
       });
     }

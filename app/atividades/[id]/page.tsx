@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ActivityStatusActions } from '@/components/activities/ActivityStatusActions';
@@ -9,10 +10,17 @@ import { SourceLink } from '@/components/ui/SourceLink';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getActivityDetail } from '@/lib/activities/queries';
 import { formatDateTimeBR, todaySP } from '@/lib/dates';
+import { prisma } from '@/lib/db';
 import { loadMembers } from '@/lib/members';
 
 const ORIGIN: Record<string, string> = { import: 'Importada da planilha indicada no INDEX.md', manual: 'Criada manualmente na Central', suggestion: 'Criada a partir de sugestão revisada' };
 const RELATION: Record<string, string> = { imported_from: 'importada de', created_by: 'origem da decisão', updated_by: 'alteração baseada em' };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const activity = await prisma.activity.findUnique({ where: { id }, select: { title: true } });
+  return { title: activity ? `${id} · ${activity.title}` : 'Atividade não encontrada' };
+}
 
 export default async function AtividadePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,7 +43,12 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
           <ul className="mt-1 list-disc pl-5">{a.pending.map((p) => <li key={p.id}>De <SourceLink name={p.sourceName} href={p.sourceUrl} />: “{p.evidence.replace(/\*\*/g, '')}”</li>)}</ul>
         </Notice>
       )}
-      {a.hasStaleSource && <Notice tone="warn" title="Fonte indisponível">Uma fonte desta atividade foi removida ou perdeu acesso. Os dados confirmados abaixo podem estar desatualizados.</Notice>}
+      {a.hasStaleSource &&
+        (a.staleReason === 'error' ? (
+          <Notice tone="warn" title="Fonte com erro de leitura">Fonte com erro de leitura — dado pode estar desatualizado. A sincronização tenta ler o arquivo de novo na próxima varredura completa.</Notice>
+        ) : (
+          <Notice tone="warn" title="Fonte indisponível">Uma fonte desta atividade foi removida ou perdeu acesso. Os dados confirmados abaixo podem estar desatualizados.</Notice>
+        ))}
 
       <dl className="grid max-w-3xl grid-cols-1 gap-x-6 sm:grid-cols-[12rem_1fr]">
         {row('Responsáveis', a.owners.length ? a.owners.map((o) => o.displayName).join(', ') : <span className="italic text-muted">Responsável a confirmar</span>)}

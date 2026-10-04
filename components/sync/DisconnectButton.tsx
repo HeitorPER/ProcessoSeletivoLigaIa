@@ -7,7 +7,6 @@ export function DisconnectButton() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -24,15 +23,14 @@ export function DisconnectButton() {
       return;
     }
     setConfirming(false);
-    setDone('Conta desconectada e cache apagado.');
-    router.refresh();
+    // A página mostra o aviso "Conta desconectada" (o botão some, pois já não há conta conectada).
+    router.push('/sincronizacao?desconectado=1');
   }
 
   if (!confirming) {
     return (
       <div>
-        <button type="button" onClick={() => { setDone(''); setError(''); setConfirming(true); }} className="rounded border border-danger px-4 py-2 font-semibold text-danger">Desconectar e limpar cache</button>
-        <p role="status" className="mt-1 text-sm">{done}</p>
+        <button type="button" onClick={() => { setError(''); setConfirming(true); }} className="rounded border border-danger px-4 py-2 font-semibold text-danger">Desconectar e limpar cache</button>
       </div>
     );
   }

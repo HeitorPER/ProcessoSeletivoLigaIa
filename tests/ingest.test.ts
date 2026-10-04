@@ -7,7 +7,7 @@ import { reviewSuggestion } from '@/lib/activities/review';
 import { updateActivity } from '@/lib/activities/service';
 import { prisma } from '@/lib/db';
 import { parseXlsx } from '@/lib/extract/xlsx';
-import { analyzeUnauthorizedSheet, ingestExtracted, ingestSource, markSourceUnavailable } from '@/lib/ingest';
+import { analyzeUnauthorizedSheet, ingestExtracted, ingestSource, markSourceUnavailable, restoreExtractedText } from '@/lib/ingest';
 import type { FetchedContent, SourceMeta } from '@/lib/types';
 import { resetDb } from './helpers/db';
 
@@ -95,6 +95,29 @@ describe('atas novas e editadas', () => {
     await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03', versionOrHash: 'v2' }), { format: 'markdown', text: `${ATA03}\n` }, ctx);
     expect(await pending()).toHaveLength(0);
   });
+  it('ata antiga reanalisada não propõe reverter decisão humana posterior (spec §3, regra 1)', async () => {
+    await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx);
+    const [s] = await pending();
+    expect(await reviewSuggestion(s.id, 'U-B', { action: 'accept' })).toMatchObject({ ok: true });
+    // a decisão vale depois do fim do dia da reunião de 01/10, independente do relógio
+    await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', type: 'suggestion_applied' }, data: { timestamp: new Date('2026-10-03T15:00:00Z') } });
+    expect((await prisma.activity.findUnique({ where: { id: 'ACT-101' } }))!.dueDate).toBe('2026-10-07');
+
+    const text = readFileSync(fx('01_CARGA_INICIAL/Ata_2026-10-01.md'), 'utf8').replace('Participaram Ana', 'Estiveram presentes Ana');
+    await ingestSource(metaFor('Ata_2026-10-01.md', { versionOrHash: 'v2' }), { format: 'markdown', text }, ctx);
+
+    const reverting = (await pendingFor('ACT-101')).filter((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-05');
+    expect(reverting).toHaveLength(0);
+    const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'Ata_2026-10-01.md', sourceVersion: 'v2' } });
+    expect(discarded.some((d) => d.reason === 'Decisão posterior já aprovada na Central para este campo — a ata não reverte o registro oficial' && d.excerpt.includes('ACT-101'))).toBe(true);
+  });
+  it('decisão humana anterior à reunião não bloqueia a proposta da ata', async () => {
+    await updateActivity('ACT-101', { dueDate: '2026-10-02' }, 'U-A');
+    await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', actorId: 'U-A' }, data: { timestamp: new Date('2026-09-30T15:00:00Z') } });
+    const text = readFileSync(fx('01_CARGA_INICIAL/Ata_2026-10-01.md'), 'utf8').replace('Participaram Ana', 'Estiveram presentes Ana');
+    await ingestSource(metaFor('Ata_2026-10-01.md', { versionOrHash: 'v2' }), { format: 'markdown', text }, ctx);
+    expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-05')).toBe(true);
+  });
   it('ata 04/10 gera criação para Carla e descarta a ideia "talvez"', async () => {
     await ingestSource(metaFor('Ata_2026-10-04.md'), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), ctx);
     const [s] = await pending();
@@ -112,6 +135,7 @@ describe('atas novas e editadas', () => {
     const src = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
     expect(src).toMatchObject({ syncStatus: 'error', processedVersion: null });
     expect(src!.statusReason).toContain('Análise da ata falhou');
+    expect(src!.statusReason).toContain('Nova tentativa na próxima varredura completa (até 10 min).');
     expect((await ingestSource(m, md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx)).status).toBe('processed');
   });
 });
@@ -131,6 +155,28 @@ describe('autoridade e conflitos', () => {
     expect(conflicts).toHaveLength(1);
     expect(conflicts[0].uncertainties).toContain('vazia');
     expect(await analyzeUnauthorizedSheet('copia')).toBe(0);
+  });
+  it('analisar planilha sem texto em cache falha com mensagem clara (nunca "0 sugestões")', async () => {
+    await ingestSource(metaFor('Ata_registro.xlsx', { fileId: 'copia-sem-texto' }), xlsx('01_CARGA_INICIAL/Ata_registro.xlsx'), ctx);
+    await prisma.source.update({ where: { fileId: 'copia-sem-texto' }, data: { extractedText: null } });
+    await expect(analyzeUnauthorizedSheet('copia-sem-texto')).rejects.toThrow('Texto da planilha indisponível — sincronize novamente antes de analisar');
+    await ingestSource(metaFor('Ata_registro.xlsx', { fileId: 'copia-sumiu' }), xlsx('01_CARGA_INICIAL/Ata_registro.xlsx'), ctx);
+    await markSourceUnavailable('copia-sumiu', 'Arquivo removido');
+    await expect(analyzeUnauthorizedSheet('copia-sumiu')).rejects.toThrow('Texto da planilha indisponível');
+  });
+  it('restoreExtractedText regrava só o texto, sem reclassificar nem reanalisar', async () => {
+    await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx);
+    await prisma.source.update({ where: { fileId: 'ata03' }, data: { extractedText: null } });
+    const before = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
+    const out = await restoreExtractedText(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), { format: 'markdown', text: ATA03 });
+    expect(out).toMatchObject({ status: 'processed', kind: 'minutes', suggestionsCreated: 0, authorityChanged: false });
+    const after = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
+    expect(after).toMatchObject({ syncStatus: 'processed', kind: 'minutes', statusReason: before!.statusReason, processedVersion: 'v1' });
+    expect(after!.extractedText).toContain('ACT-101');
+    expect(await prisma.suggestion.count()).toBe(1);
+    const bad = await restoreExtractedText(metaFor('scan.pdf', { mimeType: 'application/pdf' }), { format: 'pdf', buffer: Buffer.from('xx') });
+    expect(bad.status).toBe('error');
+    expect((await prisma.source.findUnique({ where: { fileId: 'scan.pdf' } }))!.syncStatus).toBe('error');
   });
   it('cópia com o mesmo nome da fonte vigente (outro fileId) não reimporta', async () => {
     await ingestSource(metaFor('Ata_registro.xlsx', { fileId: 'copia-subpasta' }), xlsx('01_CARGA_INICIAL/Ata_registro.xlsx'), ctx);

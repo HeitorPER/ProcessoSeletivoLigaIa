@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { emptyFields } from '@/lib/activity-fields';
 import { reviewSuggestion } from '@/lib/activities/review';
-import { createActivity } from '@/lib/activities/service';
+import { createActivity, updateActivity } from '@/lib/activities/service';
 import { prisma } from '@/lib/db';
 import { loadMembers } from '@/lib/members';
 import { listDiscarded, listSuggestions } from '@/lib/suggestions/queries';
@@ -32,6 +32,20 @@ describe('listSuggestions', () => {
     expect(v.source).toMatchObject({ name: 'Ata_2026-10-03', documentDate: '2026-10-03' });
     expect(v.currentSnapshot).toEqual({ dueDate: '2026-10-05' });
     expect((await listSuggestions('pending', carla))[0].canReview).toBe(false);
+  });
+  it('pendente mostra o valor oficial atual (não a foto do momento da sugestão)', async () => {
+    const s = await seed();
+    await prisma.suggestion.update({ where: { id: s.id }, data: { proposedFields: JSON.stringify({ dueDate: '2026-10-07', ownerIds: ['U-A', 'U-B'] }), currentSnapshot: JSON.stringify({ dueDate: '2026-10-05', ownerIds: ['U-A'] }) } });
+    await updateActivity('ACT-101', { dueDate: '2026-10-06', ownerIds: ['U-D'] }, 'U-A');
+    const [v] = await listSuggestions('pending', (await loadMembers())[0]);
+    expect(v.currentSnapshot).toEqual({ dueDate: '2026-10-06', ownerIds: ['U-D'] });
+  });
+  it('revisada mantém a foto guardada no momento da sugestão', async () => {
+    const s = await seed();
+    await reviewSuggestion(s.id, 'U-B', { action: 'reject', note: 'Prazo mantido' });
+    await updateActivity('ACT-101', { dueDate: '2026-10-06' }, 'U-A');
+    const [v] = await listSuggestions('reviewed', (await loadMembers())[0]);
+    expect(v.currentSnapshot).toEqual({ dueDate: '2026-10-05' });
   });
   it('revisadas trazem revisor e resultado', async () => {
     const s = await seed();

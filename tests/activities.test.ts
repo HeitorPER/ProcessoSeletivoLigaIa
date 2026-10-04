@@ -183,5 +183,12 @@ describe('consultas', () => {
     const a = (await listActivities({ status: 'all' }, '2026-10-03')).find((x) => x.id === 'ACT-101')!;
     expect(a.pendingSuggestions).toBe(1);
     expect(a.hasStaleSource).toBe(true);
+    expect(a.staleReason).toBe('unavailable');
+  });
+  it('distingue fonte com erro de leitura de fonte indisponível', async () => {
+    const find = async () => (await listActivities({ status: 'all' }, '2026-10-03')).find((x) => x.id === 'ACT-101')!;
+    expect(await find()).toMatchObject({ hasStaleSource: false, staleReason: null });
+    await prisma.source.update({ where: { fileId: 'reg' }, data: { syncStatus: 'error' } });
+    expect(await find()).toMatchObject({ hasStaleSource: true, staleReason: 'error' });
   });
 });

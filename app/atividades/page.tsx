@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ActivityFilters } from '@/components/activities/ActivityFilters';
 import { ActivityList } from '@/components/activities/ActivityList';
@@ -7,6 +8,8 @@ import { parseFilter } from '@/lib/activities/filters';
 import { listActivities } from '@/lib/activities/queries';
 import { todaySP } from '@/lib/dates';
 import { loadMembers } from '@/lib/members';
+
+export const metadata: Metadata = { title: 'Todas as atividades' };
 
 export default async function TodasAtividadesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { filter, values } = parseFilter(await searchParams);

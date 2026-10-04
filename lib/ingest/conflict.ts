@@ -40,7 +40,7 @@ export async function registerSourceConflict(meta: SourceMeta, doc: SpreadsheetD
 /** Chamado quando um revisor aceita um conflito de fonte: cada linha vira sugestão comum, nunca alteração direta. */
 export async function analyzeUnauthorizedSheet(fileId: string): Promise<number> {
   const source = await prisma.source.findUnique({ where: { fileId } });
-  if (!source?.extractedText) return 0;
+  if (!source?.extractedText || source.syncStatus === 'unavailable') throw new Error('Texto da planilha indisponível — sincronize novamente antes de analisar');
   const doc = storedTextToDoc(source.extractedText);
   if (doc.kind !== 'spreadsheet') return 0;
   const members = await loadMembers();

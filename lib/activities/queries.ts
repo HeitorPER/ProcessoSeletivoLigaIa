@@ -27,6 +27,8 @@ export interface ActivityListItem extends ActivitySnapshot {
   pendingSuggestions: number;
   sources: SourceRef[];
   hasStaleSource: boolean;
+  /** Por que a fonte pode estar desatualizada: removida/sem acesso ou com erro de leitura. */
+  staleReason: 'unavailable' | 'error' | null;
   origin: string;
   updatedAt: Date;
 }
@@ -47,6 +49,12 @@ export interface ActivityDetail extends ActivityListItem {
 }
 
 const STALE = new Set(['unavailable', 'error', 'stale']);
+
+function staleReasonOf(sources: SourceRef[]): ActivityListItem['staleReason'] {
+  if (sources.some((s) => s.syncStatus === 'unavailable' || s.syncStatus === 'stale')) return 'unavailable';
+  if (sources.some((s) => s.syncStatus === 'error')) return 'error';
+  return null;
+}
 
 function fetchRows(where: { id?: string } = {}) {
   return prisma.activity.findMany({
@@ -75,6 +83,7 @@ function toListItem(r: Row): ActivityListItem {
     pendingSuggestions: r.suggestions.length,
     sources: list,
     hasStaleSource: list.some((s) => STALE.has(s.syncStatus)),
+    staleReason: staleReasonOf(list),
     origin: r.origin,
     updatedAt: r.updatedAt,
   };

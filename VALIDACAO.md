@@ -6,21 +6,21 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 - **Local (observado):** execução na máquina de desenvolvimento, em 2026-10-03, com o banco de desenvolvimento carregado pelo mesmo código de ingestão usado pelo worker (`ingestSource`) e o servidor Next.js em `localhost:3000`, **sem** o Google Drive real.
 - **Drive real — pendente:** exige as credenciais Google do operador e a pasta de teste. **Ainda não foi executado.** Os passos exatos estão no [roteiro](#roteiro-para-executar-com-a-pasta-real-do-drive) abaixo e a coluna "Resultado observado" será atualizada depois dele.
 
-## Verificação automatizada (2026-10-03)
+## Verificação automatizada (2026-10-04, revisão final)
 
 | Comando | Resultado |
 | --- | --- |
-| `npm test` | 16 arquivos, **199 testes passando**, 0 falhas (duração ~57 s) |
+| `npm test` | 16 arquivos, **212 testes passando**, 0 falhas |
 | `npm run lint` | sem erros |
-| `npx tsc --noEmit` (parte de `npm run typecheck`) | sem erros |
-| `npm run build` | sem erros (executado pelo controlador na integração, antes desta tarefa; não repetido aqui para não interferir no servidor de desenvolvimento em uso) |
+| `npm run typecheck` (`next typegen` + `tsc --noEmit`) | sem erros |
+| `npm run build` | não executado na revisão final (o servidor de desenvolvimento em uso compartilha a pasta `.next`); a última execução sem erros foi a da integração, em 2026-10-03, antes das correções finais |
 
 ## Resumo dos casos
 
 | Caso | Entrada | Resultado esperado | Resultado observado | Correções importantes |
 | --- | --- | --- | --- | --- |
 | 1. Carga inicial | Pasta com `01_CARGA_INICIAL` (`INDEX.md`, `Ata_registro.xlsx`, `Ata_2026-10-01.md`, `ESTADO-ATUAL.md`, `GUIA_INICIAL.md`, `PLANO_EDITORIAL_ANTIGO.md`) | 4 atividades; Ana vê ACT-101 e ACT-104, Davi vê ACT-102 e ACT-104, Carla vê ACT-103 (bloqueada); plano antigo como histórico; nenhuma sugestão criada | Automatizado: OK. Local: OK (carga via ingestão; Ana vê as suas em "Minhas atividades"). Drive real: **pendente — executar com a pasta real** | Datas da planilha lidas pelo número serial do Excel, sem depender de fuso; atalho "ata de origem" restrito às atividades importadas |
-| 2. Arquivo adicionado ao Drive | `Ata_2026-10-04.md` enviada direto ao Drive, sem upload pela interface | Aparece processada em até 15 min; sugestão de criação para Carla (prazo 10/10/2026) | Automatizado: OK (via `changes.list` simulado). Local: OK (sugestões da ata de 04/10 carregadas pelo código de ingestão e vistas na fila). Drive real: **pendente — executar com a pasta real** (tempo até aparecer ainda não medido) | Falha da IA/leitura nunca vira "sem atividades": fonte fica com erro e é repetida |
+| 2. Arquivo adicionado ao Drive | `Ata_2026-10-04.md` enviada direto ao Drive, sem upload pela interface | Aparece processada em até 15 min; sugestão de criação para Carla (prazo 10/10/2026) | Automatizado: OK (via `changes.list` simulado). Local: a sugestão de criação para Carla **não foi conferida manualmente na interface** (coberta pelos testes automatizados; ver observações da execução local). Drive real: **pendente — executar com a pasta real** (tempo até aparecer ainda não medido) | Falha da IA/leitura nunca vira "sem atividades": fonte fica com erro e é repetida |
 | 3. Atualização de prazo | `Ata_2026-10-03` como Google Docs nativo | Sugestão de atualizar ACT-101 (prazo 05/10 → 07/10 e próximo passo) com trecho literal; oficial continua 05/10 até a aprovação; aprovada, passa a 07/10 com histórico preservado e nenhuma segunda atividade | Automatizado: OK. Local: OK — Bruno aprova e ACT-101 vai para 07/10 com evento no histórico. Drive real (Google Doc nativo/exportação): **pendente — executar com a pasta real** | Comparação tolerante do "próximo passo" (para não propor mudança falsa); `7/10` não é aceito dentro de `17/10` (fronteira de dígitos) |
 | 4. Edição de documento já conectado | Editar a ata no Drive depois de processada | Nova versão detectada; fonte não duplicada; sugestão pendente antiga marcada "substituída"; renomear não reprocessa | Automatizado: OK. Drive real: **pendente — executar com a pasta real** | Supersede só depois de extração bem-sucedida (antes apagaria a fila se a IA falhasse); renomear Google Doc não reprocessa (revisão do Drive separada do hash do conteúdo) |
 | 5. Conflito de fonte | `Ata - copia vazia.xlsx` (só cabeçalho, aba `Ata`) | Atividades permanecem; conflito visível e decidido por humano (descartar ou analisar linhas) | Automatizado: OK. Local: não verificado separadamente. Drive real: **pendente — executar com a pasta real** | Um único conflito por arquivo, mesmo com nova versão; planilha homônima de outro `fileId` nunca reimporta |
@@ -58,6 +58,8 @@ Formato: arquivo — nome do teste.
 **4. Edição de documento já conectado**
 - `tests/ingest.test.ts` — "edição da ata substitui a sugestão pendente da versão antiga"; "reprocessar ata após aceite não recria sugestão"; "o mesmo evento duas vezes não duplica sugestões"; "B: falha da IA na reedição preserva a sugestão antiga; sucesso depois a substitui"
 - `tests/sync.test.ts` — "edição gera nova versão sem duplicar a fonte; renomear não reprocessa"
+- `tests/ingest.test.ts` — "ata antiga reanalisada não propõe reverter decisão humana posterior (spec §3, regra 1)"; "decisão humana anterior à reunião não bloqueia a proposta da ata"
+- `tests/suggestions-view.test.ts` — "pendente mostra o valor oficial atual (não a foto do momento da sugestão)"
 
 **5. Conflito**
 - `tests/ingest.test.ts` — "planilha vazia homônima não apaga nada e vira conflito visível"; "cópia com o mesmo nome da fonte vigente (outro fileId) não reimporta"; "E: o mesmo arquivo em conflito gera um único source_conflict mesmo com nova versão"
@@ -79,9 +81,9 @@ Formato: arquivo — nome do teste.
 - `tests/activity-input.test.ts` — "bloqueada sem motivo efetivo gera erro"
 
 **9. Erro de fonte**
-- `tests/sync.test.ts` — "remoção e lixeira marcam a fonte como indisponível e apagam o cache"; "varredura completa detecta arquivo sumido sem evento de mudança"; "falha na varredura não marca nada como indisponível nem avança o token"; "falha transitória de download (HTTP 500) vira \"error\", não \"unavailable\""; "arquivo na lixeira (evento com trashed) vira indisponível"; "arquivo conhecido movido para fora da pasta vira indisponível"; "token revogado → estado auth_required"
-- `tests/ingest.test.ts` — "markSourceUnavailable apaga o texto em cache"; "arquivo ilegível fica \"com erro\" (não vazio)"; "formato não suportado fica \"ignorado\" com motivo e versão registrada"
-- `tests/activities.test.ts` — "indica sugestão pendente e fonte indisponível"
+- `tests/sync.test.ts` — "remoção e lixeira marcam a fonte como indisponível e apagam o cache"; "varredura completa detecta arquivo sumido sem evento de mudança"; "falha na varredura não marca nada como indisponível nem avança o token"; "falha transitória de download (HTTP 500) vira \"error\", não \"unavailable\""; "arquivo na lixeira (evento com trashed) vira indisponível"; "arquivo conhecido movido para fora da pasta vira indisponível"; "token revogado → estado auth_required"; "403 por limite de taxa (após as novas tentativas) vira \"error\" e mantém o cache; 403 de permissão vira \"unavailable\""; "a próxima varredura completa restaura o texto sem reanalisar nem criar sugestões"; "ata na lixeira e restaurada com o mesmo conteúdo não é reanalisada"
+- `tests/ingest.test.ts` — "markSourceUnavailable apaga o texto em cache"; "restoreExtractedText regrava só o texto, sem reclassificar nem reanalisar"; "analisar planilha sem texto em cache falha com mensagem clara (nunca \"0 sugestões\")"; "arquivo ilegível fica \"com erro\" (não vazio)"; "formato não suportado fica \"ignorado\" com motivo e versão registrada"
+- `tests/activities.test.ts` — "indica sugestão pendente e fonte indisponível"; "distingue fonte com erro de leitura de fonte indisponível"
 - `tests/digest.test.ts` — "incertezas: fonte indisponível e conflito de fonte"
 
 **10. Resumo pessoal**
@@ -122,7 +124,7 @@ Isto **não** substitui a validação com o Drive real: não passou por OAuth, `
 
 Pré-requisitos: cliente OAuth criado e `.env` preenchido (seções 3 e 4 do README), pasta `LIA case teste` criada e vazia, `AI_PROVIDER=none` (ou `openai` com chave, se for validar a IA real).
 
-1. `npm run setup && npm run dev`. Abrir `http://localhost:3000/sincronizacao` e clicar em **Conectar conta Google**. Esperado: retorno à aplicação com a conta (e-mail mascarado) e a pasta exibidas.
+1. Rodar `npm run setup` e depois `npm run dev` (um comando por linha; o PowerShell 5.1 não aceita `&&`). Abrir `http://localhost:3000/sincronizacao` e clicar em **Conectar conta Google**. Esperado: retorno à aplicação com a conta (e-mail mascarado) e a pasta exibidas.
 2. Enviar o conteúdo de `01_CARGA_INICIAL` para a pasta. Clicar em **Sincronizar agora**. Conferir: 4 atividades; Ana vê ACT-101/ACT-104, Davi vê ACT-102/ACT-104, Carla vê ACT-103; links das fontes abrem o arquivo no Drive; contadores e classificação das fontes (plano antigo como histórico). Registrar no caso 1.
 3. Enviar a ata de 03/10 convertida em Google Docs e a ata de 04/10 `.md`. **Sem clicar em nada**, aguardar o ciclo automático e anotar o tempo até aparecerem (meta: ≤ 15 min). Registrar nos casos 2 e 3.
 4. Em "Sugestões para revisar", abrir como Bruno (aceitar a atualização de ACT-101) e como Carla (aceitar a criação). Conferir "Minhas atividades" e "Novidades dos documentos" de Ana × Davi, e o parágrafo "Trechos sem decisão". Casos 3, 6 e 10.

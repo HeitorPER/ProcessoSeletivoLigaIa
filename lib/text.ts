@@ -1,7 +1,7 @@
 const STOPWORDS = new Set(['a', 'o', 'as', 'os', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'um', 'uma', 'para', 'por', 'com', 'no', 'na']);
 
 export function stripAccents(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 export function normalizeName(s: string): string {
@@ -10,9 +10,9 @@ export function normalizeName(s: string): string {
 
 export function normalizeForMatch(s: string): string {
   return stripAccents(s)
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/ /g, ' ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u00A0/g, ' ')
     .replace(/[*_`\\]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
