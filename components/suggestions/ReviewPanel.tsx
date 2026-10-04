@@ -7,7 +7,7 @@ type Mode = 'idle' | 'adjust' | 'reject';
 type ReviewBody = { error?: string; code?: string; status?: string; analyzed?: number | null; analysisError?: string };
 const input = 'mt-1 block w-full rounded border border-line bg-white px-3 py-2';
 
-export function ReviewPanel({ id, kind, proposed, members }: { id: string; kind: SuggestionKind; proposed: ActivityPatch; members: MemberInfo[] }) {
+export function ReviewPanel({ id, kind, proposed, members, analysisBlocked = false }: { id: string; kind: SuggestionKind; proposed: ActivityPatch; members: MemberInfo[]; analysisBlocked?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('idle');
   const [fields, setFields] = useState<ActivityPatch>(proposed);
@@ -60,7 +60,7 @@ export function ReviewPanel({ id, kind, proposed, members }: { id: string; kind:
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={() => send({ action: 'accept' })} className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+        <button type="button" disabled={busy || analysisBlocked} aria-describedby={analysisBlocked ? fid('blocked') : undefined} onClick={() => send({ action: 'accept' })} className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
           {conflict ? 'Analisar linhas como sugestões' : 'Aceitar'}
         </button>
         {!conflict && (
@@ -72,6 +72,7 @@ export function ReviewPanel({ id, kind, proposed, members }: { id: string; kind:
           {conflict ? 'Descartar planilha' : 'Rejeitar'}
         </button>
       </div>
+      {analysisBlocked && <p id={fid('blocked')} className="text-sm text-muted">Análise indisponível: a planilha não está mais na pasta. Só o descarte está liberado.</p>}
 
       {mode === 'adjust' && (
         <form id={fid('adjust')} ref={adjustForm} onSubmit={(e) => { e.preventDefault(); void send({ action: 'adjust', fields }); }} className="grid max-w-2xl gap-3 rounded border border-line p-4">

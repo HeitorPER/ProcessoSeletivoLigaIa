@@ -99,4 +99,6 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 - **Sugestão descartada em silêncio.** Na ata de 03/10 em `.md`, o GPT-6 Luna citou a 1ª e a 3ª frase do parágrafo e pulou a do meio, nas duas tentativas. A evidência deixou de ser literal e a validação descartou o item; o descarte só aparecia no terminal. Decisão (aprovada pelo usuário): (1) o prompt pede um trecho contínuo, sem pular frases (em 3 de 3 novas tentativas o modelo citou o parágrafo inteiro); (2) a validação aceita frases literais na ordem e na mesma seção, marcando o corte com `[…]` e uma incerteza; (3) todo item recusado na validação vai para "Trechos sem decisão" com o motivo.
 - **Título com asteriscos.** O export do Google Docs traz títulos em negrito (`## **Título**`) e o local da evidência aparecia com `**`. Os títulos agora são limpos na leitura.
 
-**Como foi feito:** teste primeiro (falhando), depois a correção. Resultado: 16 arquivos e 228 testes passando; typecheck e lint sem erros.
+- **Conflito de planilha que saiu da pasta.** A planilha homônima foi enviada primeiro para a subpasta errada e apagada; o alerta dela continuou pendente, e "Analisar linhas" só devolveria erro. Decisão do usuário: manter o alerta pendente com o aviso "Planilha fora da pasta" e só o descarte liberado.
+
+**Como foi feito:** teste primeiro (falhando), depois a correção. Resultado: 16 arquivos e 229 testes passando; typecheck e lint sem erros.

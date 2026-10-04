@@ -26,6 +26,8 @@ export interface SuggestionView {
   resultActivityId: string | null;
   source: { fileId: string; name: string; webUrl: string; syncStatus: string; documentDate: string | null; modifiedAt: Date };
   canReview: boolean;
+  /** Conflito cuja planilha saiu da pasta: continua pendente, mas só pode ser descartado (motivo da indisponibilidade). */
+  analysisBlockedReason: string | null;
   reviewerNames: string[];
 }
 
@@ -72,6 +74,7 @@ export async function listSuggestions(group: 'pending' | 'reviewed', viewer: Mem
         modifiedAt: s.source.modifiedAt,
       },
       canReview: canReview(viewer, s.front, members),
+      analysisBlockedReason: s.kind === 'source_conflict' && s.source.syncStatus === 'unavailable' ? (s.source.statusReason ?? 'Arquivo fora da pasta monitorada') : null,
       reviewerNames: reviewersFor(s.front, members).map((m) => m.displayName),
     };
   });

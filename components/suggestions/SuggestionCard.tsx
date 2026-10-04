@@ -24,7 +24,13 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
         {s.front && <span className="text-sm text-muted">Frente: {s.front}</span>}
       </div>
 
-      {s.source.syncStatus === 'unavailable' && <Notice tone="warn" title="Fonte indisponível">O documento foi removido ou perdeu acesso depois desta sugestão. Confira antes de aceitar.</Notice>}
+      {s.analysisBlockedReason ? (
+        <Notice tone="warn" title="Planilha fora da pasta">
+          {s.analysisBlockedReason}. Sem o arquivo não dá para analisar as linhas: descarte o alerta ou, se a planilha voltar para a pasta, a análise fica disponível de novo.
+        </Notice>
+      ) : (
+        s.source.syncStatus === 'unavailable' && <Notice tone="warn" title="Fonte indisponível">O documento foi removido ou perdeu acesso depois desta sugestão. Confira antes de aceitar.</Notice>
+      )}
 
       <FieldDiffTable proposed={s.proposedFields} current={s.currentSnapshot} members={members} showCurrent={s.kind === 'update'} />
 
@@ -45,7 +51,7 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
       )}
 
       {s.reviewStatus === 'pending' ? (
-        s.canReview ? <ReviewPanel id={s.id} kind={s.kind} proposed={s.proposedFields} members={members} /> : <p className="mt-3 text-muted">Aguardando revisão de {s.reviewerNames.join(' ou ') || 'um revisor'}.</p>
+        s.canReview ? <ReviewPanel id={s.id} kind={s.kind} proposed={s.proposedFields} members={members} analysisBlocked={s.analysisBlockedReason !== null} /> : <p className="mt-3 text-muted">Aguardando revisão de {s.reviewerNames.join(' ou ') || 'um revisor'}.</p>
       ) : (
         <p className="mt-3 text-sm">
           {s.reviewStatus === 'superseded' ? (

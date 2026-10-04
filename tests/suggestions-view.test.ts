@@ -47,6 +47,18 @@ describe('listSuggestions', () => {
     const [v] = await listSuggestions('reviewed', (await loadMembers())[0]);
     expect(v.currentSnapshot).toEqual({ dueDate: '2026-10-05' });
   });
+  it('conflito de planilha que saiu da pasta continua pendente, com aviso e só o descarte liberado', async () => {
+    await prisma.source.create({ data: { fileId: 'copia', name: 'Ata - copia vazia.xlsx', mimeType: 'x', webUrl: 'https://drive/copia', modifiedAt: new Date('2026-10-04T12:00:00Z'), versionOrHash: 'h1', kind: 'unauthorized_sheet', syncStatus: 'unavailable', statusReason: 'Arquivo enviado para a lixeira' } });
+    await prisma.source.create({ data: { fileId: 'copia2', name: 'Ata - copia vazia.xlsx', mimeType: 'x', webUrl: 'https://drive/copia2', modifiedAt: new Date('2026-10-04T12:00:00Z'), versionOrHash: 'h2', kind: 'unauthorized_sheet', extractedText: 'Atividades: ID, Título' } });
+    for (const fileId of ['copia', 'copia2']) {
+      await prisma.suggestion.create({ data: { sourceFileId: fileId, sourceVersion: 'h', kind: 'source_conflict', evidence: 'planilha homônima', reason: 'conflito', dedupeKey: `c-${fileId}` } });
+    }
+    const views = await listSuggestions('pending', (await loadMembers()).find((m) => m.id === 'U-B')!);
+    const gone = views.find((v) => v.source.fileId === 'copia')!;
+    const present = views.find((v) => v.source.fileId === 'copia2')!;
+    expect(gone).toMatchObject({ reviewStatus: 'pending', canReview: true, analysisBlockedReason: 'Arquivo enviado para a lixeira' });
+    expect(present.analysisBlockedReason).toBeNull();
+  });
   it('revisadas trazem revisor e resultado', async () => {
     const s = await seed();
     await reviewSuggestion(s.id, 'U-B', { action: 'accept' });
