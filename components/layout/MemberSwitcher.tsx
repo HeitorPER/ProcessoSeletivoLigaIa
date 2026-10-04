@@ -34,7 +34,7 @@ export function MemberSwitcher({ current, members }: { current: MemberInfo; memb
         ))}
       </select>
       <span role="status" className="text-sm">{pending ? 'Atualizando…' : announce}</span>
-      {error && <span id="vendo-como-erro" role="alert" className="text-sm text-danger">{error}</span>}
+      {error && <span id="vendo-como-erro" role="alert" className="pill bg-danger-soft text-danger">{error}</span>}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { getGoogleConnection } from '@/lib/google/oauth';
 import { describeSyncState } from '@/lib/sync/describe';
 
-const TONE = { ok: 'bg-ok-soft text-ok', warn: 'bg-warn-soft text-warn', error: 'bg-danger-soft text-danger' };
+const TONE = { ok: 'bg-white/15 text-white', warn: 'bg-warn-soft text-warn', error: 'bg-danger-soft text-danger' };
 const ICON = { ok: '●', warn: '▲', error: '✕' };
 
 export async function SyncIndicator() {

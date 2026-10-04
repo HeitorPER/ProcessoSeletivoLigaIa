@@ -15,6 +15,7 @@
   --color-surface: #f5f7fb;
   --color-canvas: #f5f5f7;
   --color-panel: #ffffff;
+  --color-header: #1433bd; /* azul da marca no cabeçalho, igual nos dois temas */
   --color-raised: #ffffff;
   --color-tint: rgb(0 0 0 / 0.05);
   --color-tint-strong: rgb(0 0 0 / 0.09);
@@ -113,6 +114,10 @@ body {
   outline: 3px solid var(--color-brand);
   outline-offset: 2px;
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+/* No cabeçalho azul, o contorno de foco é branco. */
+header :where(a, button, select):focus-visible {
+  outline-color: #ffffff;
 }
 
 /*

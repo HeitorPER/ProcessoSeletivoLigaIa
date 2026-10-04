@@ -122,7 +122,7 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 
 **O que o usuário pediu:** um visual mais limpo, no estilo da Apple: cards arredondados com sombra leve, botões arredondados, "Comece aqui" dividido em módulos, as novidades de cada categoria dentro de um card e um tema claro/escuro. Como referência de formatos e tamanhos (sem copiar cores nem ícones), uma barra lateral com itens de cantos suaves e a troca de tema no rodapé.
 
-**Decisões (aprovadas pelo usuário a partir de uma maquete):** fundo cinza claro com cards brancos; botões secundários com preenchimento suave; cabeçalho branco translúcido. O tema escuro segue o sistema até a pessoa escolher "Claro" ou "Escuro", e a escolha fica no navegador.
+**Decisões (aprovadas pelo usuário a partir de uma maquete):** fundo cinza claro com cards brancos; botões secundários com preenchimento suave. O cabeçalho chegou a ficar branco translúcido, mas o usuário preferiu manter o azul da marca (`#1433BD`, com a linha ciano), igual nos dois temas, com contorno de foco branco. O tema escuro segue o sistema até a pessoa escolher "Claro" ou "Escuro", e a escolha fica no navegador.
 
 **Como foi feito:** em vez de trocar classes página a página, criei estilos compartilhados em `app/globals.css` (`card`, `btn-*`, `pill`, `field`) e tokens semânticos (`panel`, `tint`, `raised`, `on-brand`) que o tema escuro redefine. Um script no `<head>` aplica a escolha antes da pintura, para não piscar o tema errado. Bordas transparentes mantêm cards e botões visíveis no modo de alto contraste do Windows.
 
