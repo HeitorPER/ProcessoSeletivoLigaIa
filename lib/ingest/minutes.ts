@@ -8,6 +8,8 @@ import { loadMembers } from '@/lib/members';
 import { endOfDaySP } from '@/lib/dates';
 import { FIELD_LABELS, formatFieldValue } from '@/lib/activities/format';
 import type { ActivityFields, DiscardedExcerpt, MarkdownDoc, MemberInfo, ProposedSuggestion, SourceMeta, SourceMetaJson } from '@/lib/types';
+import { truncate } from '@/lib/text';
+import type { RawExtractionItem } from '@/lib/ai/types';
 import { getSyncState, loadAuthority } from './sources';
 import { saveDiscarded, saveSuggestion, supersedePending } from './suggestions';
 
@@ -70,6 +72,13 @@ async function dropRevertsOfLaterDecisions(
   return { kept, discarded };
 }
 
+/** Item que a IA propôs e a validação recusou: fica visível em "Trechos sem decisão", nunca some em silêncio. */
+function droppedToDiscarded({ item, reason }: { item: RawExtractionItem; reason: string }): DiscardedExcerpt {
+  const label = item.kind === 'update' ? (item.target_activity_id ?? 'Atualização sem ID') : item.kind === 'create' ? `Nova atividade: ${item.title ?? 'sem título'}` : 'Sem ação';
+  const evidence = (item.evidence ?? '').trim();
+  return { excerpt: evidence ? `${label} (trecho citado pela IA: "${truncate(evidence, 300)}")` : `${label} (sem trecho citado)`, reason: `Descartado na validação: ${reason}` };
+}
+
 /**
  * `firstAnalysisAt`: quando a Central viu esta ata pela primeira vez (só se ela já foi analisada). Sem data da reunião,
  * é o corte da regra 1 e não avança a cada reedição; na primeira análise, vale a data de modificação do arquivo.
@@ -109,7 +118,7 @@ export async function processMinutes(
   await supersedePending(meta.fileId, meta.versionOrHash);
   let created = 0;
   for (const s of kept) if (await saveSuggestion(s, meta)) created++;
-  await saveDiscarded(meta.fileId, meta.versionOrHash, [...result.discarded, ...discarded]);
+  await saveDiscarded(meta.fileId, meta.versionOrHash, [...result.discarded, ...discarded, ...result.dropped.map(droppedToDiscarded)]);
   if (result.dropped.length) {
     console.info(`[ingestão] ${meta.name}: ${result.dropped.length} item(ns) descartado(s) na validação: ${result.dropped.map((d) => d.reason).join(' | ')}`);
   }

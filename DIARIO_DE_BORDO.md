@@ -89,3 +89,14 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 - **Conflito aceito sem texto.** A revisão era registrada antes de a análise falhar e o conflito nunca voltava. Decisão: conferir o texto antes de registrar; sem ele, HTTP 409 com a mensagem "Texto da planilha indisponível — sincronize novamente antes de analisar" e o conflito continua pendente.
 
 **Como foi feito:** teste primeiro (falhando), depois a correção, um commit por achado. Resultado: 16 arquivos e 222 testes passando; typecheck e lint sem erros. `npm run build` não foi executado.
+
+## 2026-10-04 — Validação no Drive real: banco de demonstração, banco corrompido e evidência da IA
+
+**O que apareceu ao conectar o Drive real:**
+- **Arquivos "indisponíveis".** O `prisma/dev.db` ainda tinha os dados fictícios que eu tinha carregado para testar as telas sem Google. Os 9 arquivos de demonstração não existiam na pasta real e viraram "indisponível", e a planilha real foi tratada como homônima da planilha já importada (a proteção funcionou, mas sobre o estado errado). Solução: recriar o banco antes da validação real.
+- **Banco corrompido no `db:reset`.** O `migrate reset` recriou o `dev.db`, mas o `dev.db-wal` e o `dev.db-shm` da execução anterior ficaram no disco, e o SQLite reaplicou páginas velhas no banco novo ("database disk image is malformed"). Decisão: `db:reset` agora apaga esses arquivos antes (e para com mensagem clara se o servidor ainda estiver rodando).
+- **IA sem créditos.** O OpenAI respondia `429 You have no credits remaining`. Não era erro de código: a conta da API precisava de créditos.
+- **Sugestão descartada em silêncio.** Na ata de 03/10 em `.md`, o GPT-6 Luna citou a 1ª e a 3ª frase do parágrafo e pulou a do meio, nas duas tentativas. A evidência deixou de ser literal e a validação descartou o item; o descarte só aparecia no terminal. Decisão (aprovada pelo usuário): (1) o prompt pede um trecho contínuo, sem pular frases (em 3 de 3 novas tentativas o modelo citou o parágrafo inteiro); (2) a validação aceita frases literais na ordem e na mesma seção, marcando o corte com `[…]` e uma incerteza; (3) todo item recusado na validação vai para "Trechos sem decisão" com o motivo.
+- **Título com asteriscos.** O export do Google Docs traz títulos em negrito (`## **Título**`) e o local da evidência aparecia com `**`. Os títulos agora são limpos na leitura.
+
+**Como foi feito:** teste primeiro (falhando), depois a correção. Resultado: 16 arquivos e 228 testes passando; typecheck e lint sem erros.

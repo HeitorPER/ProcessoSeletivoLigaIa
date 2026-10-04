@@ -190,6 +190,20 @@ describe('atas novas e editadas', () => {
     expect(discarded.some((d) => d.excerpt.includes('Talvez'))).toBe(true);
     expect(await prisma.activity.count()).toBe(4);
   });
+  it('item descartado na validação aparece em "Trechos sem decisão" (nunca em silêncio)', async () => {
+    const paraphrasing: AIProvider = {
+      name: 'parafraseia',
+      extract: async () => [{ kind: 'update', target_activity_id: 'ACT-101', title: null, owner_ids: null, due_date: '2026-10-07', next_step: null, status: null, front: null, evidence: 'Ana agora tem até o dia 7 para entregar o carrossel', uncertainties: [], reason: 'prazo mudou' }],
+      summarize: async () => null,
+    };
+    const out = await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), { provider: paraphrasing });
+    expect(out).toMatchObject({ status: 'processed', suggestionsCreated: 0 });
+    const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata03' } });
+    expect(discarded).toHaveLength(1);
+    expect(discarded[0].reason).toBe('Descartado na validação: Evidência não encontrada literalmente no documento');
+    expect(discarded[0].excerpt).toContain('ACT-101');
+    expect(discarded[0].excerpt).toContain('Ana agora tem até o dia 7');
+  });
   it('falha da IA marca erro e permite nova tentativa (nunca "sem atividades")', async () => {
     const failing: AIProvider = { name: 'falha', extract: async () => { throw new Error('timeout'); }, summarize: async () => null };
     const m = metaFor('Ata_2026-10-03', { fileId: 'ata03' });

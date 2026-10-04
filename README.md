@@ -185,7 +185,8 @@ Resumo de `03_Dados_de_Teste/LEIA_ME_PRIMEIRO.md`. Os mesmos arquivos estão em 
 - **Modo sem IA:** `AI_PROVIDER=none` (ou `openai` sem chave) usa extração por regras: parágrafo com `ACT-nnn` e data ISO vira atualização; nome de membro + compromisso + data ISO vira criação; "talvez"/"ideia"/"sem decisão" são descartados. A interface informa que a IA está desativada.
 - **O texto das atas é tratado como dado não confiável:** vai entre delimitadores `<documento>`, o prompt manda ignorar instruções escritas no documento e os delimitadores dentro do texto são neutralizados.
 - **Validação independente do modelo** (`lib/ai/validate.ts`), aplicada antes de qualquer sugestão ser gravada:
-  - a evidência precisa ser trecho literal do documento (ignorando markdown, aspas tipográficas e espaços);
+  - a evidência precisa ser trecho literal do documento (ignorando markdown, aspas tipográficas e espaços). Se o modelo juntar frases do mesmo parágrafo pulando uma do meio, cada frase é conferida literalmente, na ordem e na mesma seção; a sugestão é aceita com o corte marcado por `[…]` e a incerteza "Trecho citado com partes omitidas";
+  - item recusado pela validação não some: aparece em "Trechos sem decisão" com o motivo "Descartado na validação: …" e o trecho que a IA citou;
   - o `target_activity_id` precisa existir; senão a atualização é descartada;
   - a data precisa aparecer no trecho, com fronteira de dígitos (`7/10` não casa com `17/10`); senão o prazo vira nulo com a incerteza "prazo não explícito";
   - responsável precisa existir e ser citado no trecho; senão o campo fica vazio com "responsável a confirmar";

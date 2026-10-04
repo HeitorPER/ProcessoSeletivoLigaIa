@@ -1,5 +1,6 @@
 import { sameFieldValue } from '@/lib/activity-fields';
 import { formatDateBR, isIsoDate, MONTHS_PT } from '@/lib/dates';
+import { plainHeading } from '@/lib/extract/markdown';
 import { escapeRegExp, jaccard, normalizeForMatch, normalizeName, tokenize } from '@/lib/text';
 import { ACTIVITY_STATUSES, FRONTS, type ActivityFields, type ActivityPatch, type ActivitySnapshot, type DiscardedExcerpt, type MemberInfo, type ProposedSuggestion } from '@/lib/types';
 import type { RawExtractionItem } from './types';
@@ -69,7 +70,7 @@ function sectionsOf(text: string): { heading: string; text: string }[] {
     const m = /^#{1,6}\s+(.*?)\s*$/.exec(line);
     if (m) {
       out.push({ heading, text: buf.join('\n') });
-      heading = m[1];
+      heading = plainHeading(m[1]);
       buf = [];
     } else buf.push(line);
   }
@@ -81,6 +82,37 @@ function locate(evidence: string, ctx: ValidationContext): string | null {
   const needle = normalizeForMatch(evidence);
   const sections = ctx.sections ?? sectionsOf(ctx.text);
   return sections.find((s) => s.heading && normalizeForMatch(s.text).includes(needle))?.heading ?? null;
+}
+
+export const OMITTED_PARTS_UNCERTAINTY = 'Trecho citado com partes omitidas ([…]) — confira o contexto na ata';
+const MAX_EVIDENCE_PARTS = 4;
+
+/**
+ * Evidência aceita: um trecho literal, ou frases literais na ordem e na mesma seção. O modelo às vezes junta
+ * frases de um parágrafo pulando a do meio; cada frase continua conferida literalmente e o corte fica visível com […].
+ */
+function resolveEvidence(evidence: string, ctx: ValidationContext): { evidence: string; locator: string | null; stitched: boolean } | null {
+  if (evidenceIsLiteral(evidence, ctx.text)) return { evidence, locator: locate(evidence, ctx), stitched: false };
+  const parts = evidence
+    .replace(/\s*[[(]\s*(?:…|\.\.\.)\s*[\])]\s*/g, '\n')
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 2 || parts.length > MAX_EVIDENCE_PARTS) return null;
+  const needles = parts.map(normalizeForMatch);
+  if (needles.some((n) => n.length < MIN_EVIDENCE)) return null;
+  for (const section of ctx.sections ?? sectionsOf(ctx.text)) {
+    const hay = normalizeForMatch(section.text);
+    let from = 0;
+    const inOrder = needles.every((n) => {
+      const at = hay.indexOf(n, from);
+      if (at < 0) return false;
+      from = at + n.length;
+      return true;
+    });
+    if (inOrder) return { evidence: parts.join(' […] '), locator: section.heading || null, stitched: true };
+  }
+  return null;
 }
 
 function findSimilar(fields: ActivityPatch, activities: ActivitySnapshot[]): ActivitySnapshot | null {
@@ -98,17 +130,19 @@ export function validateItems(items: RawExtractionItem[], ctx: ValidationContext
   const result: ValidationResult = { suggestions: [], discarded: [], dropped: [] };
 
   for (const item of items) {
-    const evidence = (item.evidence ?? '').trim();
-    if (!evidenceIsLiteral(evidence, ctx.text)) {
+    const resolved = resolveEvidence((item.evidence ?? '').trim(), ctx);
+    if (!resolved) {
       result.dropped.push({ item, reason: 'Evidência não encontrada literalmente no documento' });
       continue;
     }
+    const evidence = resolved.evidence;
     if (item.kind === 'no_action') {
       result.discarded.push({ excerpt: evidence, reason: item.reason || 'Sem decisão explícita' });
       continue;
     }
 
     const uncertainties = [...(item.uncertainties ?? [])];
+    if (resolved.stitched) uncertainties.push(OMITTED_PARTS_UNCERTAINTY);
     let kind: 'create' | 'update' = item.kind;
     let target = item.target_activity_id ? ctx.activities.find((a) => a.id === item.target_activity_id) : undefined;
 
@@ -145,7 +179,7 @@ export function validateItems(items: RawExtractionItem[], ctx: ValidationContext
       if (valid.length) fields.ownerIds = valid;
     }
 
-    const evidenceLocator = locate(evidence, ctx);
+    const evidenceLocator = resolved.locator;
 
     if (kind === 'update') {
       if (fields.title) delete fields.title; // atualização não renomeia a atividade a partir de uma ata

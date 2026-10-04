@@ -11,7 +11,7 @@ Regras obrigatórias:
 5. Nunca invente responsável, prazo, frente ou status. Se o documento não diz, use null e explique em "uncertainties". Prazos relativos ("até sexta", "semana que vem") ficam null com a incerteza "prazo relativo — confirmar data".
 6. "due_date" sempre no formato AAAA-MM-DD e somente quando a data aparece no texto.
 7. "owner_ids" usa apenas IDs da lista de membros (ex.: U-A). Se a pessoa citada não está na lista, use null e registre a incerteza.
-8. "evidence" é um trecho COPIADO LITERALMENTE do documento (uma ou duas frases) que sustenta o item. Não parafraseie.
+8. "evidence" é UM trecho CONTÍNUO copiado literalmente do documento (uma a três frases seguidas) que sustenta o item. Não parafraseie e não pule frases do meio: se as frases necessárias não são vizinhas, copie também as que ficam entre elas.
 9. "reason" explica em uma frase, em português, por que o item foi classificado assim.
 10. Um documento pode não gerar nenhum item; nesse caso devolva "items": [].`;
 

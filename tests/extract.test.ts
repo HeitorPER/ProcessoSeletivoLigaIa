@@ -37,6 +37,10 @@ describe('markdown', () => {
     expect(sec?.text).toContain('**2026-10-07**');
     expect(findSectionFor(doc, 'O prazo para entregar a versão de aprovação mudou de 2026-10-05 para 2026-10-07')?.heading).toBe('Mudança confirmada na reunião');
   });
+  it('título em negrito exportado do Google Docs vira texto simples', () => {
+    const doc = parseMarkdown('# **Ata 03/10**\n\n## **Mudança confirmada na reunião**\n\nO prazo mudou para 2026-10-07.\n\n## __Outra__ seção');
+    expect(doc.sections.map((s) => s.heading)).toEqual(['Ata 03/10', 'Mudança confirmada na reunião', 'Outra seção']);
+  });
   it('plano antigo é reconhecido como deprecated', () => {
     const doc = parseMarkdown(readText('01_CARGA_INICIAL/PLANO_EDITORIAL_ANTIGO.md'));
     expect(doc.frontMatter.status).toBe('deprecated');

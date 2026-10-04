@@ -6,6 +6,11 @@ export function unescapeMarkdown(text: string): string {
   return text.replace(/\\([\\`*_{}[\]()#+\-.!>~|])/g, '$1');
 }
 
+/** Título sem marcas de ênfase: o export do Google Docs traz títulos em negrito como `## **Título**`. */
+export function plainHeading(heading: string): string {
+  return heading.replace(/(\*\*|__)(.+?)\1/g, '$2').replace(/^([*_])(.+)\1$/, '$2').trim();
+}
+
 /** O export `text/markdown` do Google Docs escapa caracteres e usa espaço não separável. */
 export function normalizeGoogleDocMarkdown(text: string): string {
   return unescapeMarkdown(text.replace(/\u00A0/g, ' '));
@@ -26,7 +31,7 @@ export function parseMarkdown(raw: string): MarkdownDoc {
     const m = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line);
     if (m) {
       flush();
-      current = { heading: m[2].trim(), level: m[1].length, text: '', startLine: idx + 1 };
+      current = { heading: plainHeading(m[2]), level: m[1].length, text: '', startLine: idx + 1 };
     } else {
       buf.push(line);
     }

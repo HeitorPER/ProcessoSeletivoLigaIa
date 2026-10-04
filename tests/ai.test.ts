@@ -122,6 +122,35 @@ describe('validateItems', () => {
   });
 });
 
+describe('validateItems: evidência com frases puladas', () => {
+  // O modelo real juntou a 1ª e a 3ª frase do parágrafo e pulou a do meio (observado com gpt-6-luna na ata de 03/10).
+  const STITCHED = 'O prazo para entregar a versão de aprovação mudou de 2026-10-05 para **2026-10-07**. Próximo passo de Ana: fechar o roteiro e enviar para Bruno.';
+  it('frases literais, na ordem e na mesma seção: aceita, marca o corte com […] e registra a incerteza', () => {
+    const r = validateItems([item({ target_activity_id: 'ACT-101', due_date: '2026-10-07', next_step: 'Fechar o roteiro e enviar para Bruno', evidence: STITCHED })], ctx(ATA03));
+    expect(r.dropped).toEqual([]);
+    expect(r.suggestions).toHaveLength(1);
+    const s = r.suggestions[0];
+    expect(s.evidence).toBe('O prazo para entregar a versão de aprovação mudou de 2026-10-05 para **2026-10-07**. […] Próximo passo de Ana: fechar o roteiro e enviar para Bruno.');
+    expect(s.proposedFields).toEqual({ dueDate: '2026-10-07', nextStep: 'Fechar o roteiro e enviar para Bruno' });
+    expect(s.evidenceLocator).toBe('Mudança confirmada na reunião');
+    expect(s.uncertainties).toContain('Trecho citado com partes omitidas ([…]) — confira o contexto na ata');
+  });
+  it('frases fora de ordem ou de seções diferentes continuam descartadas', () => {
+    const reversed = 'Próximo passo de Ana: fechar o roteiro e enviar para Bruno. O prazo para entregar a versão de aprovação mudou de 2026-10-05 para **2026-10-07**.';
+    const crossSection = 'Participaram Ana e Bruno. O prazo para entregar a versão de aprovação mudou de 2026-10-05 para **2026-10-07**.';
+    for (const evidence of [reversed, crossSection]) {
+      const r = validateItems([item({ target_activity_id: 'ACT-101', due_date: '2026-10-07', evidence })], ctx(ATA03));
+      expect(r.suggestions).toHaveLength(0);
+      expect(r.dropped[0].reason).toBe('Evidência não encontrada literalmente no documento');
+    }
+  });
+  it('uma frase inventada no meio derruba o item', () => {
+    const invented = 'O prazo para entregar a versão de aprovação mudou de 2026-10-05 para **2026-10-07**. Ana confirmou que consegue entregar. Próximo passo de Ana: fechar o roteiro e enviar para Bruno.';
+    const r = validateItems([item({ target_activity_id: 'ACT-101', due_date: '2026-10-07', evidence: invented })], ctx(ATA03));
+    expect(r.suggestions).toHaveLength(0);
+  });
+});
+
 describe('validateItems: ancoragem de responsável e estado', () => {
   it('responsável que não aparece no trecho é removido e vira incerteza (criação)', () => {
     const r = validateItems([item({ kind: 'create', title: 'Revisar pauta da primeira oficina', owner_ids: ['U-D'], due_date: '2026-10-10', evidence: EV04 })], ctx(ATA04));
