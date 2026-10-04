@@ -21,3 +21,13 @@ prisma/*.db-journal
 .DS_Store
 Thumbs.db
 *.log
+
+# workspace de execução (local)
+.superpowers/
+
+/generated/
+prisma/test.db*
+prisma/dev.db*
+
+# worktrees de agentes (local)
+.claude/worktrees/
