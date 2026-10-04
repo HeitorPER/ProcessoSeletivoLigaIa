@@ -4,13 +4,13 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 
 - **Automatizado:** teste do Vitest (arquivo e nome do teste indicados), rodando contra um banco SQLite descartável, com os arquivos reais do pacote (`tests/fixtures`) e um Drive simulado.
 - **Local (observado):** execução na máquina de desenvolvimento, em 2026-10-03, com o banco de desenvolvimento carregado pelo mesmo código de ingestão usado pelo worker (`ingestSource`) e o servidor Next.js em `localhost:3000`, **sem** o Google Drive real.
-- **Drive real — pendente:** exige as credenciais Google do operador e a pasta de teste. **Ainda não foi executado.** Os passos exatos estão no [roteiro](#roteiro-para-executar-com-a-pasta-real-do-drive) abaixo e a coluna "Resultado observado" será atualizada depois dele.
+- **Drive real (observado em 2026-10-04):** OAuth com a conta Google do operador, pasta de teste própria (`central_liga_ia_test`), worker rodando (`npm run dev`) e `AI_PROVIDER=openai` com GPT-6 Luna real. Detalhes em [Execução com o Drive real](#execução-com-o-drive-real-2026-10-04). Casos ainda sem observação no Drive real continuam marcados como pendentes.
 
-## Verificação automatizada (2026-10-04, re-revisão)
+## Verificação automatizada (2026-10-04, depois da validação no Drive real)
 
 | Comando | Resultado |
 | --- | --- |
-| `npm test` | 16 arquivos, **222 testes passando**, 0 falhas |
+| `npm test` | 16 arquivos, **228 testes passando**, 0 falhas |
 | `npm run lint` | sem erros |
 | `npm run typecheck` (`next typegen` + `tsc --noEmit`) | sem erros |
 | `npm run build` | não executado na revisão final nem na re-revisão (o servidor de desenvolvimento em uso compartilha a pasta `.next`); a última execução sem erros foi a da integração, em 2026-10-03, antes das correções finais |
@@ -19,15 +19,15 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 
 | Caso | Entrada | Resultado esperado | Resultado observado | Correções importantes |
 | --- | --- | --- | --- | --- |
-| 1. Carga inicial | Pasta com `01_CARGA_INICIAL` (`INDEX.md`, `Ata_registro.xlsx`, `Ata_2026-10-01.md`, `ESTADO-ATUAL.md`, `GUIA_INICIAL.md`, `PLANO_EDITORIAL_ANTIGO.md`) | 4 atividades; Ana vê ACT-101 e ACT-104, Davi vê ACT-102 e ACT-104, Carla vê ACT-103 (bloqueada); plano antigo como histórico; nenhuma sugestão criada | Automatizado: OK. Local: OK (carga via ingestão; Ana vê as suas em "Minhas atividades"). Drive real: **pendente — executar com a pasta real** | Datas da planilha lidas pelo número serial do Excel, sem depender de fuso; atalho "ata de origem" restrito às atividades importadas |
-| 2. Arquivo adicionado ao Drive | `Ata_2026-10-04.md` enviada direto ao Drive, sem upload pela interface | Aparece processada em até 15 min; sugestão de criação para Carla (prazo 10/10/2026) | Automatizado: OK (via `changes.list` simulado). Local: a sugestão de criação para Carla **não foi conferida manualmente na interface** (coberta pelos testes automatizados; ver observações da execução local). Drive real: **pendente — executar com a pasta real** (tempo até aparecer ainda não medido) | Falha da IA/leitura nunca vira "sem atividades": fonte fica com erro e é repetida |
-| 3. Atualização de prazo | `Ata_2026-10-03` como Google Docs nativo | Sugestão de atualizar ACT-101 (prazo 05/10 → 07/10 e próximo passo) com trecho literal; oficial continua 05/10 até a aprovação; aprovada, passa a 07/10 com histórico preservado e nenhuma segunda atividade | Automatizado: OK. Local: OK — Bruno aprova e ACT-101 vai para 07/10 com evento no histórico. Drive real (Google Doc nativo/exportação): **pendente — executar com a pasta real** | Comparação tolerante do "próximo passo" (para não propor mudança falsa); `7/10` não é aceito dentro de `17/10` (fronteira de dígitos) |
-| 4. Edição de documento já conectado | Editar a ata no Drive depois de processada | Nova versão detectada; fonte não duplicada; sugestão pendente antiga marcada "substituída"; renomear não reprocessa | Automatizado: OK. Drive real: **pendente — executar com a pasta real** | Supersede só depois de extração bem-sucedida (antes apagaria a fila se a IA falhasse); renomear Google Doc não reprocessa (revisão do Drive separada do hash do conteúdo) |
-| 5. Conflito de fonte | `Ata - copia vazia.xlsx` (só cabeçalho, aba `Ata`) | Atividades permanecem; conflito visível e decidido por humano (descartar ou analisar linhas) | Automatizado: OK. Local: não verificado separadamente. Drive real: **pendente — executar com a pasta real** | Um único conflito por arquivo, mesmo com nova versão; planilha homônima de outro `fileId` nunca reimporta |
-| 6. Ideia vaga | Parágrafo "Talvez… série diária" da ata de 04/10 | Não vira atividade; aparece em "Trechos sem decisão" | Automatizado: OK (modo por regras). Local: não verificado separadamente. Com GPT-6 Luna real: **não verificado** (nenhuma chamada à API foi feita) | Regra do prompt e das regras: hipóteses viram `no_action` com motivo |
+| 1. Carga inicial | Pasta com `01_CARGA_INICIAL` (`INDEX.md`, `Ata_registro.xlsx`, `Ata_2026-10-01.md`, `ESTADO-ATUAL.md`, `GUIA_INICIAL.md`, `PLANO_EDITORIAL_ANTIGO.md`) | 4 atividades; Ana vê ACT-101 e ACT-104, Davi vê ACT-102 e ACT-104, Carla vê ACT-103 (bloqueada); plano antigo como histórico; nenhuma sugestão criada | Automatizado: OK. Local: OK (carga via ingestão; Ana vê as suas em "Minhas atividades"). Drive real: **OK** — os 6 arquivos processados, `Ata_registro.xlsx` reconhecida pelo `INDEX.md` e importada, plano antigo como histórico, ata de 01/10 como origem (sem chamar a IA); responsáveis exatamente como esperado | Datas da planilha lidas pelo número serial do Excel, sem depender de fuso; atalho "ata de origem" restrito às atividades importadas |
+| 2. Arquivo adicionado ao Drive | `Ata_2026-10-04.md` enviada direto ao Drive, sem upload pela interface | Aparece processada em até 15 min; sugestão de criação para Carla (prazo 10/10/2026) | Automatizado: OK (via `changes.list` simulado). Local: a sugestão de criação para Carla **não foi conferida manualmente na interface** (coberta pelos testes automatizados; ver observações da execução local). Drive real: **OK** — `Ata_2026-10-04.md` processada e sugestão de criação para Carla (prazo 10/10/2026), aceita por Carla (vira `ACT-M-001`). Nesta rodada a sincronização foi disparada com "Sincronizar agora"; a detecção automática foi medida no caso 4 (1 min 16 s) | Falha da IA/leitura nunca vira "sem atividades": fonte fica com erro e é repetida |
+| 3. Atualização de prazo | `Ata_2026-10-03` como Google Docs nativo | Sugestão de atualizar ACT-101 (prazo 05/10 → 07/10 e próximo passo) com trecho literal; oficial continua 05/10 até a aprovação; aprovada, passa a 07/10 com histórico preservado e nenhuma segunda atividade | Automatizado: OK. Local: OK — Bruno aprova e ACT-101 vai para 07/10 com evento no histórico. Drive real: **OK** — Google Doc nativo exportado e analisado pelo GPT-6 Luna; sugestão de ACT-101 (prazo 07/10 e próximo passo) com trecho literal; o `.docx` original aparece como "não lido diretamente — converta para Google Docs". Achado: a versão `.md` da mesma ata teve a sugestão descartada em silêncio (ver Execução com o Drive real) | Comparação tolerante do "próximo passo" (para não propor mudança falsa); `7/10` não é aceito dentro de `17/10` (fronteira de dígitos) |
+| 4. Edição de documento já conectado | Editar a ata no Drive depois de processada | Nova versão detectada; fonte não duplicada; sugestão pendente antiga marcada "substituída"; renomear não reprocessa | Automatizado: OK. Drive real: **OK** — Google Doc editado às 14:02:06 (prazo para 08/10), detectado **automaticamente** pelo ciclo incremental às 14:03:22 (**1 min 16 s**); sugestão antiga marcada "substituída"; nova sugestão aceita por Bruno; ACT-101 foi para 08/10 com histórico | Supersede só depois de extração bem-sucedida (antes apagaria a fila se a IA falhasse); renomear Google Doc não reprocessa (revisão do Drive separada do hash do conteúdo) |
+| 5. Conflito de fonte | `Ata - copia vazia.xlsx` (só cabeçalho, aba `Ata`) | Atividades permanecem; conflito visível e decidido por humano (descartar ou analisar linhas) | Automatizado: OK. Drive real: **OK** — planilha detectada automaticamente pelo ciclo incremental, classificada como "não é a fonte indicada no INDEX.md", conflito pendente visível e ACT-101..104 mantidas. Observação: a planilha foi enviada primeiro numa subpasta errada e depois apagada; o conflito do arquivo apagado continuou pendente | Um único conflito por arquivo, mesmo com nova versão; planilha homônima de outro `fileId` nunca reimporta |
+| 6. Ideia vaga | Parágrafo "Talvez… série diária" da ata de 04/10 | Não vira atividade; aparece em "Trechos sem decisão" | Automatizado: OK (modo por regras). Local: não verificado separadamente. Com GPT-6 Luna real: **OK** — o parágrafo "Talvez…" foi para "Trechos sem decisão" com o motivo "apenas uma ideia, sem responsável, prazo ou decisão" | Regra do prompt e das regras: hipóteses viram `no_action` com motivo |
 | 7. Dado ausente | Ata nova (`.md` de teste, a criar) com compromisso sem prazo ou sem responsável | Sugestão com "prazo a definir" / "responsável a confirmar", sem valores inventados | Automatizado: OK para a validação (saída da IA sem dono/prazo). **No modo por regras o trecho é ignorado, não vira sugestão** (limitação). Drive real e IA real: **pendente — executar com a pasta real** | Responsável precisa aparecer no trecho; data precisa aparecer com fronteira de dígitos; senão vira incerteza |
 | 8. Atividade manual e reinício | Criar atividade pela interface; reiniciar `npm run dev` | Atividade continua com autor e histórico | Automatizado: OK (criação grava ID `ACT-M-001`, autor e evento no banco). Reinício do servidor: **pendente — verificação manual** (não depende do Drive) | Regra "bloquear exige motivo" aplicada nas rotas |
-| 9. Erro de fonte | Remover um arquivo (ou tirar o acesso) no Drive | Fonte "indisponível" com motivo, cache de texto apagado, atividade marcada como potencialmente desatualizada | Automatizado: OK (remoção, lixeira, movido para fora, varredura completa). Drive real: **pendente — executar com a pasta real** | Falha transitória (HTTP 500) vira "erro", não "indisponível"; falha de varredura não avança o token |
+| 9. Erro de fonte | Remover um arquivo (ou tirar o acesso) no Drive | Fonte "indisponível" com motivo, cache de texto apagado, atividade marcada como potencialmente desatualizada | Automatizado: OK (remoção, lixeira, movido para fora, varredura completa). Drive real: **OK** — `.docx` e `.md` da ata de 03/10 enviados para a lixeira viraram "indisponível" com o motivo "Arquivo enviado para a lixeira" | Falha transitória (HTTP 500) vira "erro", não "indisponível"; falha de varredura não avança o token |
 | 10. Resumo pessoal | Ata/atualização relevante só para Ana | "Novidades" de Ana mostra a mudança; Davi não vê; mudança em ACT-104 aparece para os dois | Automatizado: OK. Local: tela "Novidades" não verificada separadamente. Resumo redigido por IA: **não verificado** | Fatos montados por código; a IA só redige o parágrafo rotulado |
 | 11. Primeiro acesso | Membro novo abre "Comece aqui" | Propósito marcado como provisório, frentes, fonte das atividades, primeira ação, links | Automatizado: OK. Verificação visual no navegador: **pendente** | Documento indisponível nunca mostra texto antigo |
 | 12. Acessibilidade | Teclado (Tab/Shift+Tab, foco visível), largura de 375 px, contraste | Tudo operável por teclado, foco visível, sem rolagem horizontal, contraste ≥ 4,5:1 | Contraste: **calculado** (abaixo). Teclado e 375 px: **pendente — verificação manual no navegador** | Rótulos, `aria-describedby`, `aria-live` e erros em texto ajustados nas revisões da interface |
@@ -121,6 +121,29 @@ Registro do que o controlador verificou com o banco de desenvolvimento carregado
 
 Isto **não** substitui a validação com o Drive real: não passou por OAuth, `changes.list`, exportação de Google Docs nem pela espera do ciclo automático.
 
+## Execução com o Drive real (2026-10-04)
+
+Ambiente: Windows 11, `npm run dev` (web + worker), OAuth com a conta Google do operador em modo Testing, pasta de teste própria com subpastas `01_CARGA_INICIAL`, `02_ADICIONAR_DEPOIS_DA_CARGA` e `03_CONFLITO`, `AI_PROVIDER=openai` (`gpt-6-luna`). Horários em America/Sao_Paulo.
+
+| Passo | Observado |
+| --- | --- |
+| Carga inicial | 6 arquivos processados; 4 atividades; Ana: ACT-101 e ACT-104; Davi: ACT-102 e ACT-104; Carla: ACT-103 (bloqueada) |
+| Atas novas | Ata de 04/10: criação para Carla e "Talvez…" descartado. Ata de 03/10 (Google Doc): atualização de ACT-101 que só Bruno pode revisar |
+| Revisões | Bruno aceitou a atualização de ACT-101; Carla aceitou a criação (`ACT-M-001`); Ana não tem permissão de revisar (conferido na interface pelo operador) |
+| Edição de arquivo conhecido | Edição às 14:02:06, detecção automática às 14:03:22 (**1 min 16 s**, meta ≤ 15 min); sugestão antiga substituída |
+| Planilha homônima | Detectada pelo ciclo automático; conflito visível; atividades mantidas |
+| Lixeira | Arquivos apagados viraram "indisponível" com motivo |
+
+**Problemas encontrados e corrigidos nesta execução:**
+
+- **Banco com dados de demonstração.** O `dev.db` ainda tinha uma carga fictícia usada para testar as telas sem Google; os arquivos dela viraram "indisponível" e a planilha real foi tratada como homônima. Solução: recriar o banco antes da validação real.
+- **`db:reset` corrompia o banco** ("database disk image is malformed"): o `dev.db-wal` de uma execução anterior era reaplicado no banco novo. Corrigido: o script apaga `-wal`/`-shm` antes (teste em `tests/utils.test.ts`).
+- **Créditos do OpenAI.** Sem créditos na conta da API, o modelo respondia `429`. Não era erro de código.
+- **Sugestão descartada em silêncio.** Na ata de 03/10 em `.md`, o GPT-6 Luna juntou a 1ª e a 3ª frase de um parágrafo, pulando a do meio, e a validação descartou o item sem aviso na interface. Corrigido: prompt pede trecho contínuo (3 de 3 novas tentativas citaram o parágrafo inteiro); frases literais na ordem e na mesma seção são aceitas com `[…]` e incerteza; todo item recusado na validação vai para "Trechos sem decisão" (testes em `tests/ai.test.ts` e `tests/ingest.test.ts`).
+- **Título com asteriscos.** O export do Google Docs traz títulos em negrito; o local da evidência aparecia como `**Mudança confirmada na reunião**`. Corrigido (teste em `tests/extract.test.ts`); a sugestão gerada depois da edição já mostra o título limpo.
+
+**Ainda pendente no Drive real:** casos 7 (ata sem prazo ou sem responsável), 8 (reinício), 10 (Novidades de Ana × Davi), 11 (primeiro acesso), 12 (teclado e 375 px), renomear um arquivo sem reprocessar.
+
 ## Roteiro para executar com a pasta real do Drive
 
 Pré-requisitos: cliente OAuth criado e `.env` preenchido (seções 3 e 4 do README), pasta `LIA case teste` criada e vazia, `AI_PROVIDER=none` (ou `openai` com chave, se for validar a IA real).
@@ -136,7 +159,6 @@ Pré-requisitos: cliente OAuth criado e `.env` preenchido (seções 3 e 4 do REA
 
 ## O que este registro não cobre
 
-- Chamadas reais ao Google Drive e ao OpenAI (nenhuma foi feita).
-- Tempo real de detecção em até 15 minutos (por construção o ciclo incremental é de 2 minutos; a medição real está pendente).
+- Tempo de detecção de arquivos **novos** sem clique (medido só para edição, 1 min 16 s; o ciclo incremental roda a cada 2 minutos).
 - Interface no navegador (teclado, 375 px, leitores de tela).
 - Arquivos grandes, pastas com milhares de itens e uso por várias pessoas ao mesmo tempo.
