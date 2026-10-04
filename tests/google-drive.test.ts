@@ -4,7 +4,7 @@ import { decryptSecret, encryptSecret } from '@/lib/google/crypto';
 import { buildAuthUrl, disconnectGoogle, getAuthorizedClient, getGoogleConnection, maskEmail, saveRefreshToken } from '@/lib/google/oauth';
 import type { Auth, drive_v3 } from 'googleapis';
 import { createDriveApi, toDriveError, toDriveFileMeta } from '@/lib/drive/client';
-import { isRetryable, withRetry } from '@/lib/drive/retry';
+import { isRetryable, isTemporaryDriveError, withRetry } from '@/lib/drive/retry';
 import { isInsideTree, walkTree } from '@/lib/drive/tree';
 import { DriveError, FOLDER_MIME, type DriveApi, type DriveFileMeta } from '@/lib/drive/types';
 import { resetDb } from './helpers/db';
@@ -95,6 +95,20 @@ describe('retry', () => {
     expect(isRetryable(new DriveError('rate', 403, 'userRateLimitExceeded'))).toBe(true);
     expect(isRetryable(new DriveError('perm', 403, 'insufficientFilePermissions'))).toBe(false);
   });
+  it('cotas do Drive: limite de compartilhamento é repetido; cota diária/de download não é repetida, mas é temporária', async () => {
+    expect(isRetryable(new DriveError('rate', 403, 'sharingRateLimitExceeded'))).toBe(true);
+    for (const reason of ['dailyLimitExceeded', 'quotaExceeded', 'downloadQuotaExceeded']) {
+      const e = new DriveError('cota', 403, reason);
+      expect(isRetryable(e), reason).toBe(false);
+      expect(isTemporaryDriveError(e), reason).toBe(true);
+      const fn = vi.fn().mockRejectedValue(e);
+      await expect(withRetry(fn, { sleep })).rejects.toThrow('cota');
+      expect(fn).toHaveBeenCalledTimes(1);
+    }
+    expect(isTemporaryDriveError(new DriveError('rate', 403, 'userRateLimitExceeded'))).toBe(true);
+    expect(isTemporaryDriveError(new DriveError('perm', 403, 'insufficientFilePermissions'))).toBe(false);
+    expect(isTemporaryDriveError(new DriveError('não encontrado', 404))).toBe(false);
+  });
 });
 
 describe('árvore', () => {
@@ -124,6 +138,8 @@ describe('árvore', () => {
       const api = { ...fakeApi([]), getFile: async () => { throw new DriveError('negado', status); } };
       expect(await isInsideTree(api, meta('x', 'x.md', ['pai-privado']), { root: 'LIA' }, 'root')).toBeNull();
     }
+    const quota = { ...fakeApi([]), getFile: async () => { throw new DriveError('cota', 403, 'dailyLimitExceeded'); } };
+    await expect(isInsideTree(quota, meta('x', 'x.md', ['p']), { root: 'LIA' }, 'root')).rejects.toThrow('cota');
     const api = { ...fakeApi([]), getFile: async () => { throw new DriveError('falha', 500); } };
     await expect(isInsideTree(api, meta('x', 'x.md', ['p']), { root: 'LIA' }, 'root')).rejects.toThrow('falha');
   });

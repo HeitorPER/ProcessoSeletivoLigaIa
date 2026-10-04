@@ -1,7 +1,7 @@
 import type { AIProvider } from '@/lib/ai/types';
 import { prisma } from '@/lib/db';
 import { isInsideTree, walkTree, type DriveFileWithPath } from '@/lib/drive/tree';
-import { isRetryable } from '@/lib/drive/retry';
+import { isTemporaryDriveError } from '@/lib/drive/retry';
 import { DriveError, FOLDER_MIME, GSHEET_MIME, XLSX_MIME, type DriveApi } from '@/lib/drive/types';
 import { isIndexFile } from '@/lib/authority/classify';
 import { ingestSource, markSourceUnavailable, mergeSourceMeta, restoreExtractedText, upsertSourceMeta, type IngestOutcome } from '@/lib/ingest';
@@ -75,8 +75,8 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
     content = await fetchContent(deps.api, file);
   } catch (e) {
     await upsertSourceMeta(toSourceMeta(file, existing?.versionOrHash ?? revision));
-    // 403 por limite de taxa (já esgotadas as novas tentativas) é temporário: erro, cache mantido.
-    if (e instanceof DriveError && (e.status === 404 || (e.status === 403 && !isRetryable(e)))) {
+    // 403 por limite de taxa (já esgotadas as novas tentativas) ou por cota do Drive é temporário: erro, cache mantido.
+    if (e instanceof DriveError && (e.status === 404 || (e.status === 403 && !isTemporaryDriveError(e)))) {
       await markSourceUnavailable(file.id, `Sem acesso ao conteúdo do arquivo (HTTP ${e.status})`);
       return 'unavailable';
     }

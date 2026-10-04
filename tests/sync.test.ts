@@ -236,6 +236,19 @@ describe('ciclo de sincronização', () => {
     expect(await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } })).toMatchObject({ syncStatus: 'unavailable', extractedText: null });
   });
 
+  it('403 por cota do Drive (diária, de download, de compartilhamento) vira "error" sem novas tentativas inúteis e mantém o cache', async () => {
+    for (const reason of ['dailyLimitExceeded', 'quotaExceeded', 'downloadQuotaExceeded', 'sharingRateLimitExceeded']) {
+      drive.add({ ...drive.files.get('ESTADO-ATUAL.md')!, md5Checksum: `md5-estado-${reason}` });
+      drive.failDownload.set('ESTADO-ATUAL.md', new DriveError('Quota exceeded', 403, reason));
+      drive.change('ESTADO-ATUAL.md');
+      const r = await runCycle(depsFor(drive), 'incremental');
+      expect(r, reason).toMatchObject({ errors: 1, unavailable: 0 });
+      const src = await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } });
+      expect(src!.syncStatus, reason).toBe('error');
+      expect(src!.extractedText, reason).toBeTruthy();
+    }
+  });
+
   it('arquivo na lixeira (evento com trashed) vira indisponível', async () => {
     drive.add({ ...drive.files.get('GUIA_INICIAL.md')!, trashed: true });
     drive.change('GUIA_INICIAL.md');

@@ -1,11 +1,15 @@
+import { isTemporaryDriveError } from './retry';
 import { DriveError, FOLDER_MIME, type DriveApi, type DriveFileMeta } from './types';
 
-/** Ancestral sem permissão (403) ou inexistente (404) significa "não dá para alcançar a árvore por aqui", não falha de sync. */
+/**
+ * Ancestral sem permissão (403) ou inexistente (404) significa "não dá para alcançar a árvore por aqui", não falha de sync.
+ * 403 por limite de taxa ou cota é passageiro: propaga, para o ciclo falhar sem marcar o arquivo como fora da pasta.
+ */
 async function getAncestor(api: DriveApi, id: string): Promise<DriveFileMeta | null> {
   try {
     return await api.getFile(id);
   } catch (e) {
-    if (e instanceof DriveError && (e.status === 403 || e.status === 404)) return null;
+    if (e instanceof DriveError && ((e.status === 403 && !isTemporaryDriveError(e)) || e.status === 404)) return null;
     throw e;
   }
 }
