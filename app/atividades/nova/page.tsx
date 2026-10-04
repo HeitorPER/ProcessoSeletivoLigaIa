@@ -1,7 +1,10 @@
+import type { Metadata } from 'next';
 import { ActivityForm } from '@/components/activities/ActivityForm';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { emptyFields } from '@/lib/activity-fields';
 import { loadMembers } from '@/lib/members';
+
+export const metadata: Metadata = { title: 'Nova atividade' };
 
 export default async function NovaAtividadePage() {
   const members = await loadMembers();

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AiSummary } from '@/components/digest/AiSummary';
 import { DigestSection } from '@/components/digest/DigestSection';
@@ -13,6 +14,8 @@ import { buildDigest } from '@/lib/summary/digest';
 import { resolvePeriod } from '@/lib/summary/period';
 import { touchVisit } from '@/lib/visits';
 import { SOURCE_KIND_LABELS, SYNC_STATUS_LABELS, type SourceKind, type SyncStatus } from '@/lib/types';
+
+export const metadata: Metadata = { title: 'Novidades dos documentos' };
 
 export default async function NovidadesPage({ searchParams }: { searchParams: Promise<{ desde?: string }> }) {
   const member = await getCurrentMember();

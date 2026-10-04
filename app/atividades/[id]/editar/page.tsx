@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ActivityForm } from '@/components/activities/ActivityForm';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -5,6 +6,11 @@ import { FIELD_KEYS, pickFields } from '@/lib/activity-fields';
 import { getActivitySnapshot } from '@/lib/activities/service';
 import { loadMembers } from '@/lib/members';
 import type { ActivityFields } from '@/lib/types';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return { title: `Editar ${id}` };
+}
 
 export default async function EditarAtividadePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

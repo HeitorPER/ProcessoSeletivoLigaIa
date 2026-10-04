@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ActivityStatusActions } from '@/components/activities/ActivityStatusActions';
@@ -9,10 +10,17 @@ import { SourceLink } from '@/components/ui/SourceLink';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getActivityDetail } from '@/lib/activities/queries';
 import { formatDateTimeBR, todaySP } from '@/lib/dates';
+import { prisma } from '@/lib/db';
 import { loadMembers } from '@/lib/members';
 
 const ORIGIN: Record<string, string> = { import: 'Importada da planilha indicada no INDEX.md', manual: 'Criada manualmente na Central', suggestion: 'Criada a partir de sugestão revisada' };
 const RELATION: Record<string, string> = { imported_from: 'importada de', created_by: 'origem da decisão', updated_by: 'alteração baseada em' };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const activity = await prisma.activity.findUnique({ where: { id }, select: { title: true } });
+  return { title: activity ? `${id} · ${activity.title}` : 'Atividade não encontrada' };
+}
 
 export default async function AtividadePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SuggestionCard } from '@/components/suggestions/SuggestionCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -27,6 +28,8 @@ function ResultNotice({ params }: { params: Params }) {
     </>
   );
 }
+
+export const metadata: Metadata = { title: 'Sugestões para revisar' };
 
 export default async function SugestoesPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;

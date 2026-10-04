@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ActivityFilters } from '@/components/activities/ActivityFilters';
 import { ActivityList } from '@/components/activities/ActivityList';
@@ -8,6 +9,8 @@ import { listActivities } from '@/lib/activities/queries';
 import { todaySP } from '@/lib/dates';
 import { loadMembers } from '@/lib/members';
 import { getCurrentMember } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Minhas atividades' };
 
 export default async function MinhasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const member = await getCurrentMember();

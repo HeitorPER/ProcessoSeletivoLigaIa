@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { DueLabel } from '@/components/ui/DueLabel';
 import { MarkdownText } from '@/components/ui/MarkdownText';
@@ -8,6 +9,8 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatDateTimeBR, todaySP } from '@/lib/dates';
 import { getOnboarding } from '@/lib/onboarding';
 import { getCurrentMember } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Comece aqui' };
 
 export default async function ComeceAquiPage() {
   const member = await getCurrentMember();

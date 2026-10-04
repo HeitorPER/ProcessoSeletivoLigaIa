@@ -10,7 +10,10 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
-export const metadata: Metadata = { title: 'Central da Liga IA UFSCar', description: 'Contexto, onboarding e atividades da Liga IA UFSCar' };
+export const metadata: Metadata = {
+  title: { template: '%s · Central da Liga IA UFSCar', default: 'Central da Liga IA UFSCar' },
+  description: 'Contexto, onboarding e atividades da Liga IA UFSCar',
+};
 export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
