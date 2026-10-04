@@ -90,14 +90,17 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
     await mergeSourceMeta(file.id, { driveRevision: revision });
     return 'unchanged';
   }
-  // Mesmo conteúdo já analisado, só faltando o texto: restaura o cache sem reanalisar (nada de sugestões repetidas).
+  // Mesmo conteúdo já analisado, só faltando o texto: restaura o cache sem reanalisar (nada de sugestões repetidas),
+  // desde que a classificação com o INDEX atual não tenha mudado; se mudou, segue para a ingestão completa.
   const restorable = existing && existing.processedVersion === hash
     && (existing.syncStatus === 'unavailable' || (existing.syncStatus === 'processed' && textMissing));
   if (!force && restorable && content.format !== 'unsupported') {
     const reason = existing.syncStatus === 'unavailable' ? 'Arquivo acessível de novo, com o mesmo conteúdo já analisado — texto restaurado sem nova análise' : undefined;
     const restored = await restoreExtractedText(toSourceMeta(file, hash), content, reason);
-    if (restored.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });
-    return restored;
+    if (restored) {
+      if (restored.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });
+      return restored;
+    }
   }
   const outcome = await ingestSource(toSourceMeta(file, hash), content, { provider: deps.provider });
   if (outcome.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });
@@ -185,7 +188,8 @@ export async function runCycle(deps: SyncDeps, requested: SyncMode): Promise<Syn
       tally(t, r);
       counted.add(file.id);
       if (r === 'unchanged') unchangedIds.add(file.id);
-      if (authorityChanged && typeof r === 'object') ingestedAfterChange.add(file.id);
+      // só restaurar o texto não reavalia contra o INDEX novo: a reavaliação forçada abaixo ainda cobre o arquivo
+      if (authorityChanged && typeof r === 'object' && !r.restoredOnly) ingestedAfterChange.add(file.id);
       if (typeof r === 'object' && r.authorityChanged) authorityChanged = true;
     }
     if (authorityChanged) {

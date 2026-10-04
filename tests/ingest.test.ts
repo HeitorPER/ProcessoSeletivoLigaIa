@@ -175,7 +175,7 @@ describe('autoridade e conflitos', () => {
     expect(after!.extractedText).toContain('ACT-101');
     expect(await prisma.suggestion.count()).toBe(1);
     const bad = await restoreExtractedText(metaFor('scan.pdf', { mimeType: 'application/pdf' }), { format: 'pdf', buffer: Buffer.from('xx') });
-    expect(bad.status).toBe('error');
+    expect(bad?.status).toBe('error');
     expect((await prisma.source.findUnique({ where: { fileId: 'scan.pdf' } }))!.syncStatus).toBe('error');
   });
   it('cópia com o mesmo nome da fonte vigente (outro fileId) não reimporta', async () => {

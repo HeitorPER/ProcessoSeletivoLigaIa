@@ -331,6 +331,51 @@ describe('ciclo de sincronização', () => {
       expect(calls.extract).toBe(0);
       expect(await prisma.suggestion.count()).toBe(0);
     });
+
+    it('INDEX mudou no mesmo ciclo em que o texto foi apagado: as planilhas são reclassificadas, não só restauradas', async () => {
+      drive.add(file('outro', 'Outro_registro.xlsx', fx('01_CARGA_INICIAL/Ata_registro.xlsx')));
+      drive.change('outro');
+      await runCycle(depsFor(drive), 'incremental');
+      const outroBefore = (await prisma.source.findUnique({ where: { fileId: 'outro' } }))!;
+      expect(outroBefore.kind).toBe('unauthorized_sheet');
+
+      await prisma.source.updateMany({ data: { extractedText: null } }); // mesmo efeito de disconnectGoogle
+      const index = fx('01_CARGA_INICIAL/INDEX.md').toString('utf8');
+      drive.add({ ...drive.files.get('INDEX.md')!, content: Buffer.from(index.replace('`Ata_registro.xlsx`', '`Outro_registro.xlsx`')), md5Checksum: 'md5-index-editado' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const r = await runCycle(depsFor(drive), 'full');
+
+      const reg = (await prisma.source.findUnique({ where: { fileId: 'reg' } }))!;
+      const outro = (await prisma.source.findUnique({ where: { fileId: 'outro' } }))!;
+      expect(reg.kind).not.toBe('activity_registry'); // deixou de ser a fonte nomeada no INDEX
+      // mesmo tipo de antes, mas reavaliada contra o novo INDEX (não apenas restaurada)
+      expect(outro.lastProcessedAt!.getTime()).toBeGreaterThan(outroBefore.lastProcessedAt!.getTime());
+      expect(outro.statusReason).toContain('mesmo nome da fonte vigente');
+      for (const s of [reg, outro]) expect(s.extractedText, s.fileId).toBeTruthy();
+      expect(r).toMatchObject({ errors: 0, unavailable: 0 });
+      expect(r.processed + r.ignored + r.errors + r.unavailable + r.unchanged).toBe(9);
+    });
+
+    it('ata que volta da lixeira depois de o INDEX marcá-la como superada vira histórico (não fica como ata)', async () => {
+      const ata01 = drive.files.get('Ata_2026-10-01.md')!;
+      drive.add({ ...ata01, trashed: true });
+      drive.change('Ata_2026-10-01.md');
+      const index = fx('01_CARGA_INICIAL/INDEX.md').toString('utf8');
+      drive.add({ ...drive.files.get('INDEX.md')!, content: Buffer.from(`${index}\n\`Ata_2026-10-01.md\` foi superado por \`GUIA_INICIAL.md\`.\n`), md5Checksum: 'md5-index-superada' });
+      drive.change('INDEX.md');
+      expect((await runCycle(depsFor(drive), 'incremental')).unavailable).toBe(1);
+
+      drive.add({ ...ata01, trashed: false });
+      drive.change('Ata_2026-10-01.md');
+      const { calls, provider } = counting();
+      const r = await runCycle({ ...depsFor(drive), provider }, 'incremental');
+      expect(r).toMatchObject({ processed: 1, errors: 0 });
+      const src = await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } });
+      expect(src).toMatchObject({ syncStatus: 'processed', kind: 'deprecated' });
+      expect(src!.extractedText).toContain('ACT-101');
+      expect(calls.extract).toBe(0);
+      expect(await prisma.suggestion.count()).toBe(0);
+    });
   });
 
   it('ciclos concorrentes: o segundo é ignorado pelo lock', async () => {

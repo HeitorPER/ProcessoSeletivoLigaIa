@@ -22,6 +22,8 @@ export interface IngestOutcome {
   reason: string;
   suggestionsCreated: number;
   authorityChanged: boolean;
+  /** Só o texto foi restaurado (sem reclassificar): não conta como reavaliação depois de o INDEX mudar. */
+  restoredOnly?: boolean;
 }
 
 export async function ingestSource(meta: SourceMeta, content: FetchedContent, ctx: IngestContext): Promise<IngestOutcome> {
@@ -46,10 +48,12 @@ export async function ingestSource(meta: SourceMeta, content: FetchedContent, ct
 
 /**
  * Conteúdo idêntico ao já analisado (`processedVersion`), mas sem texto em cache — depois de desconectar
- * a conta ou de o arquivo voltar da lixeira. Só extrai e regrava o texto: não reclassifica, não reanalisa
- * e não cria nem substitui sugestões. `statusReason` substitui o motivo atual quando informado.
+ * a conta ou de o arquivo voltar da lixeira. Só extrai e regrava o texto (não reanalisa e não cria nem
+ * substitui sugestões), e só quando a classificação atual (com o INDEX de agora) é a mesma já gravada.
+ * Se a classificação mudou (INDEX editado enquanto o texto faltava), devolve `null`: quem chamou faz a
+ * ingestão completa. `statusReason` substitui o motivo atual quando informado.
  */
-export async function restoreExtractedText(meta: SourceMeta, content: Exclude<FetchedContent, { format: 'unsupported' }>, statusReason?: string): Promise<IngestOutcome> {
+export async function restoreExtractedText(meta: SourceMeta, content: Exclude<FetchedContent, { format: 'unsupported' }>, statusReason?: string): Promise<IngestOutcome | null> {
   const existing = await prisma.source.findUnique({ where: { fileId: meta.fileId } });
   await upsertSourceMeta(meta);
   let doc: ExtractedDoc;
@@ -61,13 +65,17 @@ export async function restoreExtractedText(meta: SourceMeta, content: Exclude<Fe
     return { status: 'error', kind: null, reason, suggestionsCreated: 0, authorityChanged: false };
   }
   const metaJson = parseJson<SourceMetaJson>(existing?.meta, {});
+  const c = classify({ fileId: meta.fileId, name: meta.name, mimeType: meta.mimeType, doc }, await loadAuthority());
+  const sameClassification = existing !== null && c.kind === existing.kind && (c.meetingDate ?? null) === (metaJson.meetingDate ?? null)
+    && (c.kind !== 'activity_registry' || c.registrySheet === metaJson.registrySheet);
+  if (!sameClassification) return null;
   if (doc.kind === 'markdown') metaJson.frontMatter = doc.frontMatter;
-  const reason = statusReason ?? existing?.statusReason ?? 'Texto restaurado';
+  const reason = statusReason ?? existing.statusReason ?? 'Texto restaurado';
   await prisma.source.update({
     where: { fileId: meta.fileId },
     data: { syncStatus: 'processed', statusReason: reason, extractedText: docToStoredText(doc), meta: JSON.stringify(metaJson) },
   });
-  return { status: 'processed', kind: (existing?.kind as SourceKind | undefined) ?? null, reason, suggestionsCreated: 0, authorityChanged: false };
+  return { status: 'processed', kind: c.kind, reason, suggestionsCreated: 0, authorityChanged: false, restoredOnly: true };
 }
 
 export async function ingestExtracted(meta: SourceMeta, doc: ExtractedDoc, ctx: IngestContext): Promise<IngestOutcome> {
