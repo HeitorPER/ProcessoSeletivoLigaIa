@@ -59,7 +59,7 @@ Só o **worker** conversa com o Drive. O Next.js só lê e grava no banco. O bot
 
 Decisão: **depois da importação inicial, o banco da aplicação é o registro oficial**. A planilha do Drive é a base da primeira importação e depois vira uma fonte que gera *sugestões*. A regra de precedência, também descrita na tela "Comece aqui":
 
-1. **Decisão humana aprovada na aplicação** (edição manual ou sugestão aceita/ajustada) define o estado oficial.
+1. **Decisão humana aprovada na aplicação** (edição manual ou sugestão aceita/ajustada) define o estado oficial. Uma ata reanalisada depois (por exemplo, uma ata antiga editada no Drive) não propõe reverter um campo que alguém decidiu na Central depois da data da reunião: esse campo sai da sugestão e fica registrado em "Trechos sem decisão" com o motivo "Decisão posterior já aprovada na Central para este campo — a ata não reverte o registro oficial".
 2. **Ata nova com decisão explícita** gera uma sugestão pendente; nunca altera o oficial sozinha. Enquanto pendente, a atividade mostra "atualização proposta pendente".
 3. **A planilha apontada pelo `INDEX.md`** é a base da primeira importação (eventos `import`, autor `system`). Versões posteriores dela geram sugestões por diferença de campo.
 4. **Arquivos superados (`deprecated`), planilhas sem autoridade, rascunhos e textos históricos** nunca alteram atividades. Uma planilha com cabeçalho de atividades fora da fonte vigente gera um conflito de fonte para decisão humana.
@@ -76,18 +76,29 @@ O que isso significa na prática:
 
 Requisitos: Node.js 22 ou superior (testado com 22.13) e npm. Não é preciso instalar banco de dados.
 
+Antes de instalar:
+
+- **`npm install` precisa acessar `cdn.sheetjs.com`.** O leitor de planilhas (SheetJS) é instalado pelo tarball oficial do fornecedor (`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`), não pelo registro do npm. Em rede com proxy ou lista de domínios permitidos, libere esse domínio.
+- **`better-sqlite3` é um módulo nativo.** Normalmente baixa um binário pronto; se não houver binário para o seu sistema/versão do Node, ele compila na hora e precisa das ferramentas de build (Windows: "Desktop development with C++" do Visual Studio Build Tools e Python; macOS: Xcode Command Line Tools; Linux: `build-essential` e Python).
+- **Windows PowerShell 5.1 não aceita `&&`.** Rode os comandos abaixo um por linha (como estão escritos).
+
 ```bash
 git clone <URL-DO-REPOSITÓRIO>
 cd ProcessoSeletivoLigaIa
 npm install
-cp .env.example .env        # no Windows (cmd): copy .env.example .env
+cp .env.example .env
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# copie o valor gerado para TOKEN_ENC_KEY no .env
-npm run setup               # cria prisma/dev.db, aplica as migrações e cria os 4 membros fictícios
-npm run dev                 # sobe o Next.js e o worker de sincronização juntos
+npm run setup
+npm run dev
 ```
 
+- `cp .env.example .env`: no Windows use `copy .env.example .env`.
+- O comando `node -e ...` gera uma chave aleatória: **copie o valor para `TOKEN_ENC_KEY` no `.env`**. O valor que vem no `.env.example` é público (está no repositório) e não protege nada.
+- `npm run setup` cria `prisma/dev.db`, aplica as migrações e cria os 4 membros fictícios; `npm run dev` sobe o Next.js e o worker de sincronização juntos.
+
 Abra <http://localhost:3000>. Sem credenciais do Google a aplicação abre normalmente (com atividades vazias e "Desconectado do Drive"); a conexão com o Drive é descrita na próxima seção. `AI_PROVIDER=none` (padrão do `.env.example`) funciona sem chave de IA.
+
+> **Atenção aos valores de exemplo do Google.** O `.env.example` traz textos como `<SEU_CLIENT_ID_WEB>` nas variáveis do Google. Como elas não ficam vazias, o botão **Conectar conta Google** aparece, mas a conexão falha até você colocar os valores reais (seção 4). Se ainda não vai usar o Drive, deixe essas variáveis vazias.
 
 Outros comandos:
 
@@ -108,7 +119,7 @@ Variáveis do `.env` (nenhum valor real deve ser versionado; `.env` está no `.g
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Cliente OAuth "Web application" |
 | `GOOGLE_REDIRECT_URI` | `http://localhost:3000/api/google/callback` |
 | `DRIVE_TEST_FOLDER_ID` | ID da pasta do Drive monitorada |
-| `TOKEN_ENC_KEY` | Chave que criptografa o refresh token no banco (AES-256-GCM) |
+| `TOKEN_ENC_KEY` | Chave que criptografa o refresh token no banco (AES-256-GCM). Troque o valor de exemplo por um texto aleatório (comando acima): o exemplo é público |
 | `AI_PROVIDER` | `none` (regras) ou `openai` |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Só com `AI_PROVIDER=openai`; modelo padrão `gpt-6-luna`. Sem chave, a aplicação volta para o modo por regras e avisa no log |
 | `SYNC_INCREMENTAL_MS`, `SYNC_FULL_MS` | Intervalos do worker (padrão 120000 e 600000) |
@@ -123,7 +134,7 @@ Resumo do guia `04_Guia_Google_Drive_API.md` do pacote do caso. Use sua própria
 4. Em *Clients*, crie um cliente **Web application** com:
    - origem JavaScript autorizada: `http://localhost:3000`
    - URI de redirecionamento autorizado: **`http://localhost:3000/api/google/callback`** (precisa ser idêntico ao `GOOGLE_REDIRECT_URI`, incluindo porta e sem barra final).
-5. Copie o ID e o segredo do cliente para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env`.
+5. Copie o ID e o segredo do cliente para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env`, substituindo os textos de exemplo (`<SEU_CLIENT_ID_WEB>`, `<SEU_CLIENT_SECRET>`). Com os textos de exemplo o botão "Conectar conta Google" aparece, mas o Google recusa a conexão. Confira também se `TOKEN_ENC_KEY` já é um valor aleatório seu (seção 3).
 6. No seu Google Drive, crie a pasta `LIA case teste`. Abra a pasta no navegador; o ID é o trecho final da URL (`https://drive.google.com/drive/folders/<ID>`). Coloque-o em `DRIVE_TEST_FOLDER_ID`.
 7. Com `npm run dev` rodando, abra **Estado da sincronização**, clique em **Conectar conta Google**, escolha a conta de teste e confirme o acesso. A aplicação lista a pasta e as subpastas e processa os arquivos.
 
@@ -150,9 +161,10 @@ Resumo de `03_Dados_de_Teste/LEIA_ME_PRIMEIRO.md`. Os mesmos arquivos estão em 
 - **Botão "Sincronizar agora":** cria um pedido; o worker atende no próximo tick. Uma trava no banco impede dois ciclos ao mesmo tempo.
 - **Idempotência:** a identidade da fonte é o `file_id` do Drive. A versão é o `md5Checksum` (binários) ou o hash do texto exportado (Google Docs/Sheets). Mesmo arquivo e mesma versão não reprocessam nem duplicam sugestões. A chave de deduplicação das sugestões é única no banco.
 - **Renomear ou mover:** o arquivo mantém o ID; só nome e caminho são atualizados, sem reprocessar (o Drive muda a "versão" de um Google Doc ao renomear; por isso a aplicação compara também o hash do conteúdo).
-- **Removido, na lixeira ou sem acesso:** a fonte vira "indisponível", o texto em cache é apagado e as atividades ligadas a ela aparecem como possivelmente desatualizadas.
+- **Removido, na lixeira ou sem acesso:** a fonte vira "indisponível", o texto em cache é apagado e as atividades ligadas a ela aparecem como possivelmente desatualizadas. Só um HTTP 403 **de permissão** marca a fonte como indisponível; um 403 por limite de taxa (`rateLimitExceeded`, `userRateLimitExceeded`), depois das novas tentativas, vira "erro" e o texto em cache é mantido. Na lista e no detalhe, "Fonte com erro de leitura" e "Fonte indisponível" aparecem com textos diferentes.
+- **Texto em cache apagado (desconectar a conta ou arquivo que volta da lixeira):** a próxima varredura completa (ou o primeiro ciclo depois de reconectar) baixa o arquivo de novo. Se o conteúdo é o mesmo que já foi analisado, a aplicação só restaura o texto: não reclassifica, não chama a IA e não cria nem substitui sugestões. Se o conteúdo mudou, o arquivo é processado como uma edição comum.
 - **Ata editada:** as sugestões pendentes da versão anterior viram "substituída" só depois que a nova análise termina com sucesso; as já aceitas continuam no histórico.
-- **Falha nunca vira "vazio":** erro de download, de leitura ou da IA marca a fonte com "erro" e o motivo, mantém o estado anterior e tenta de novo no próximo ciclo. Erros 429/5xx/timeout têm até 5 tentativas com espera de 2, 4, 8, 16 e 32 s.
+- **Falha nunca vira "vazio":** erro de download, de leitura ou da IA marca a fonte com "erro" e o motivo, mantém o estado anterior e tenta de novo no próximo ciclo. Erros 429/5xx/timeout e 403 por limite de taxa têm até 5 novas tentativas (6 no total) com espera de 2, 4, 8, 16 e 32 s. Chamadas ao OpenAI têm tempo limite de 60 s e uma nova tentativa; a falha vira "erro" da fonte com a mensagem "Falha ao chamar o modelo: …" (sem a chave).
 - **Token expirado ou revogado:** o estado vira "Reconexão com o Google necessária"; as atividades continuam visíveis.
 - O indicador no cabeçalho mostra o estado em texto ("Sincronizado há 3 min", "Falha na sincronização", "Sincronizador parado", "Desconectado do Drive").
 
@@ -192,7 +204,7 @@ Preço do GPT-6 Luna consultado em 2026-10-03: **US$ 0,10 por 1 milhão de token
 | Resumo pessoal | ~1 mil de entrada + ~0,2 mil de saída | ~US$ 0,0002 |
 | Demonstração completa (poucas atas e alguns resumos) | | menos de US$ 0,01 |
 
-São estimativas por ordem de grandeza (não medimos tokens reais com a API; a validação ponta a ponta foi feita sem chamar o OpenAI). O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
+São estimativas por ordem de grandeza (não medimos tokens reais com a API; a verificação local e os testes automatizados foram feitos sem chamar o OpenAI). O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
 
 ## 10. Testes
 
@@ -200,7 +212,7 @@ São estimativas por ordem de grandeza (não medimos tokens reais com a API; a v
 npm test
 ```
 
-Resultado da última execução: **16 arquivos, 199 testes passando**; `npm run typecheck` e `npm run lint` sem erros. Os testes usam um banco SQLite descartável (`prisma/test.db`) e os arquivos reais do pacote em `tests/fixtures`. Eles cobrem: extratores (`.md`, `.xlsx`, front-matter, Google Docs); parser do `INDEX.md` e classificação (incluindo a planilha homônima vazia); importação inicial (4 atividades, `ACT-104` com dois donos, `ACT-103` bloqueada); diferença da planilha; validação da saída da IA; modo por regras nas atas de 03/10 e 04/10; provedor OpenAI com cliente simulado; idempotência (mesmo arquivo duas vezes, aprovação duas vezes); ciclo de sincronização com Drive simulado (novo, editado, renomeado, removido, lixeira, falha temporária, token revogado, trava de concorrência); criação, edição e revisão de atividades; permissões de revisão; "o que mudou" para Ana e Davi; rotas de revisão (403/200/409).
+Resultado da última execução (2026-10-04, revisão final): **16 arquivos, 212 testes passando**; `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run lint` sem erros. `npm run build` não foi executado nessa rodada. Os testes usam um banco SQLite descartável (`prisma/test.db`) e os arquivos reais do pacote em `tests/fixtures`. Eles cobrem: extratores (`.md`, `.xlsx`, front-matter, Google Docs); parser do `INDEX.md` e classificação (incluindo a planilha homônima vazia); importação inicial (4 atividades, `ACT-104` com dois donos, `ACT-103` bloqueada); diferença da planilha; validação da saída da IA; modo por regras nas atas de 03/10 e 04/10; provedor OpenAI com cliente simulado; idempotência (mesmo arquivo duas vezes, aprovação duas vezes); ciclo de sincronização com Drive simulado (novo, editado, renomeado, removido, lixeira e restaurado, falha temporária, 403 por limite de taxa × permissão, texto em cache apagado e restaurado sem reanálise, token revogado, trava de concorrência); ata antiga que não reverte decisão humana posterior; criação, edição e revisão de atividades; permissões de revisão; "o que mudou" para Ana e Davi; rotas de revisão (403/200/409).
 
 O que **não** é coberto por testes automatizados: chamadas reais ao Google Drive e ao OpenAI, interface no navegador (teclado, 375 px). Esses casos estão no registro de validação, com o status real de cada um: [`VALIDACAO.md`](VALIDACAO.md).
 
@@ -216,6 +228,7 @@ O que **não** é coberto por testes automatizados: chamadas reais ao Google Dri
 - **A IA pode errar.** Por isso existe a validação independente e a revisão humana; a validação checa evidência, datas, IDs e responsáveis, mas não consegue garantir que a *interpretação* do trecho esteja certa.
 - **A extração por regras cobre só padrões explícitos** (ID `ACT-nnn` + data ISO; nome + compromisso + data). Um compromisso sem data ou sem responsável nomeado é simplesmente ignorado nesse modo (não vira sugestão com "prazo a definir"; isso só acontece com a IA ligada). Prazos relativos ("até sexta") não são convertidos em data: viram incerteza.
 - **Detalhes conhecidos da revisão:** uma sugestão rejeitada pode reaparecer se a ata for editada de modo trivial (a deduplicação considera a versão da ata); uma planilha editada pode reapresentar um valor já rejeitado se outro campo da mesma linha mudar; o marcador "desde a última visita" avança com a renderização da página e não só com a leitura explícita do resumo.
+- **Decisão humana × ata antiga:** a proteção da regra 1 compara a hora da decisão na Central com o fim do dia da reunião (fuso de São Paulo, UTC−3, sem horário de verão). Uma decisão tomada no mesmo dia da reunião, antes do fim do dia, não bloqueia a proposta da ata; ela aparece normalmente para revisão.
 - **Download sem limite de tamanho** para arquivos binários (só a exportação de Google Docs tem o limite de 10 MB do Google).
 - Sem tela de erro dedicada: se o banco estiver indisponível, o layout falha por inteiro. A fonte Inter é buscada da rede durante o build.
 - Rotas `POST` sem verificação de `Origin` e cookie de identidade sem `httpOnly` (aceitável só porque a identidade é de demonstração).
@@ -234,7 +247,7 @@ O que **não** é coberto por testes automatizados: chamadas reais ao Google Dri
 
 ## 13. Como limpar dados
 
-- **Pela interface:** "Estado da sincronização" > **Desconectar e limpar cache**. Isso revoga o token no Google e apaga o token e os textos extraídos do banco.
+- **Pela interface:** "Estado da sincronização" > **Desconectar e limpar cache**. Isso revoga o token no Google e apaga o token e os textos extraídos do banco; a página confirma com o aviso "Conta desconectada". Atividades, sugestões e histórico são mantidos. Ao reconectar, a primeira sincronização restaura os textos sem reanalisar documentos que não mudaram.
 - **Recomeçar do zero:** pare a aplicação, apague `prisma/dev.db` (e `prisma/dev.db-wal`/`-shm`, se existirem) e rode `npm run setup`. O banco local contém atividades, histórico e o token criptografado.
 - **Revogar o app no Google:** <https://myaccount.google.com/connections> > selecione o app de teste > *Remover acesso*. Se um segredo vazou, troque o cliente OAuth no Cloud Console.
 
@@ -246,8 +259,9 @@ O que **não** é coberto por testes automatizados: chamadas reais ao Google Dri
 
 **Decisões que mudei depois de verificar saídas incorretas:**
 
-1. **Datas confundidas dentro de outras.** Uma revisão mostrou que a checagem "a data aparece no trecho" aceitava `7/10` dentro de `17/10`; uma saída do modelo com a data errada poderia passar como "confirmada pelo trecho". Troquei por uma checagem com fronteira de dígitos, com teste dedicado (`dateMentioned exige limites de dígitos`).
-2. **Atalhos do plano que perdiam análise em silêncio.** O plano original tinha um atalho "ata de origem do registro, sem análise" e mandava substituir as sugestões antigas *antes* de extrair a nova versão. Ao conferir o comportamento, percebi que o primeiro poderia dispensar a análise de atas novas citadas como "Origem" e que o segundo apagaria a fila de revisão se a IA falhasse. Redesenhei: o atalho só vale para atividades da importação inicial, e as sugestões antigas só são substituídas depois de uma extração bem-sucedida.
-3. **Edições da planilha empilhando sugestões contraditórias.** O diff original comparava cada versão com a anterior e gerava propostas que se contradiziam. Passei a comparar com a base da importação (ou da atividade aceita), com deduplicação sem versão e substituição por alvo.
+1. **Datas confundidas dentro de outras (achado de revisão de código).** Na revisão do código gerado pela IA de desenvolvimento, encontrei que a checagem "a data aparece no trecho" aceitava `7/10` dentro de `17/10`. Não foi uma saída observada do modelo: foi um defeito no código que deixaria passar, como "confirmada pelo trecho", uma data errada que o modelo viesse a propor. Troquei por uma checagem com fronteira de dígitos, com teste dedicado (`dateMentioned exige limites de dígitos`).
+2. **Mudanças falsas no "próximo passo" (saída incorreta observada).** Ao comparar o "próximo passo" proposto a partir da ata de 01/10 com o oficial, apareceram "mudanças" que eram só paráfrases ("revisar o material de entrada…" × "Revisar material…"). Passei a usar comparação tolerante para propostas (`sameFieldValue`: ignora markdown, aspas tipográficas, espaços e diferenças pequenas), mantendo a comparação estrita para edições humanas, que sempre entram no histórico.
+3. **Atalhos do plano que perdiam análise em silêncio.** O plano original tinha um atalho "ata de origem do registro, sem análise" e mandava substituir as sugestões antigas *antes* de extrair a nova versão. Ao conferir o comportamento, percebi que o primeiro poderia dispensar a análise de atas novas citadas como "Origem" e que o segundo apagaria a fila de revisão se a IA falhasse. Redesenhei: o atalho só vale para atividades da importação inicial, e as sugestões antigas só são substituídas depois de uma extração bem-sucedida.
+4. **Edições da planilha empilhando sugestões contraditórias.** O diff original comparava cada versão com a anterior e gerava propostas que se contradiziam. Passei a comparar com a base da importação (ou da atividade aceita), com deduplicação sem versão e substituição por alvo.
 
 Outras correções estão no diário (aspas tipográficas trocadas em uma expressão regular, verificação do nome do modelo na documentação da OpenAI, entre outras).

@@ -60,3 +60,20 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 **Achados menores adiados de propósito** (cada um está registrado no ledger da execução e resumido nas limitações do README): erros do SDK da OpenAI não são embrulhados em erro próprio; a deduplicação por versão pode fazer uma sugestão rejeitada reaparecer após edição trivial da ata; o marcador "desde a última visita" avança na renderização da página; rotas `POST` sem verificação de `Origin`; download de binários sem limite de tamanho.
 
 **Próximos passos:** (1) o Heitor cria o cliente OAuth, preenche o `.env` e a pasta `LIA case teste`; (2) executar o roteiro do `VALIDACAO.md` e substituir cada "pendente" pelo resultado observado, incluindo o tempo até a detecção automática; (3) conferir teclado e 375 px; (4) se for demonstrar a IA, rodar uma ata com `AI_PROVIDER=openai` e medir o custo real.
+
+## 2026-10-03 — Revisão final do branch e onda de correções
+
+**O que a revisão final encontrou** (revisão do branch inteiro depois das 14 tarefas):
+- **Importante — textos vazios para sempre depois de desconectar e reconectar.** "Desconectar e limpar cache" apagava `extractedText`, mas a fonte continuava "processada" com a mesma revisão do Drive; o ciclo seguinte dizia "sem mudança" e nunca baixava de novo. "Comece aqui" e a análise de planilhas em conflito ficavam sem texto.
+- **Importante — ata antiga reanalisada propunha reverter decisão humana.** Se a ata de 01/10 fosse editada depois que Bruno aceitou o prazo 07/10 de ACT-101, a reanálise propunha voltar para 05/10, contrariando a regra 1 da precedência.
+- **Menores promovidos:** páginas sem título próprio (WCAG 2.4.2); caracteres invisíveis literais (NBSP, BOM, acentos combinantes) em expressões regulares; nenhuma confirmação visível depois de desconectar.
+- **Correções baratas:** o "Oficial agora" da sugestão pendente era uma foto antiga; "erro de leitura" e "indisponível" apareciam com o mesmo texto; 403 por limite de taxa marcava a fonte como indisponível e apagava o cache; o cliente OpenAI não tinha tempo limite e os erros do SDK não viravam erro próprio; mensagens de nova tentativa diferentes entre o motor e a ingestão.
+
+**O que mudou:**
+- Fonte sem texto em cache (exceto formato não suportado) é baixada de novo. Se o conteúdo é o mesmo já analisado, `restoreExtractedText` só regrava o texto: sem reclassificar, sem chamar a IA, sem sugestões novas ou substituídas. O mesmo vale para arquivo que volta da lixeira sem mudança. Analisar planilha sem texto agora falha com mensagem clara em vez de "0 sugestões".
+- Antes de gravar sugestões de uma ata, os campos com decisão humana na Central depois do fim do dia da reunião (fuso de São Paulo) são removidos e registrados em "Trechos sem decisão" com o motivo.
+- Títulos por página com o modelo `%s · Central da Liga IA UFSCar`; escapes `\u00A0`, `\uFEFF`, `\u0300-\u036f` e aspas tipográficas em regex; aviso "Conta desconectada" no servidor.
+- "Oficial agora" calculado da atividade viva enquanto a sugestão está pendente; `staleReason` distingue erro de indisponível; 403 só vira indisponível por permissão; OpenAI com 60 s de tempo limite, uma nova tentativa e `AIError` sem a chave; mensagem única "Nova tentativa na próxima varredura completa (até 10 min)".
+- Documentação: pré-requisitos de instalação (acesso a `cdn.sheetjs.com`, build nativo do `better-sqlite3`, PowerShell 5.1 sem `&&`), avisos sobre os valores de exemplo do Google e do `TOKEN_ENC_KEY`, contagem de tentativas ("5 novas, 6 no total") e a seção 14 separando o achado de revisão de código (`7/10` × `17/10`) do caso observado (paráfrases do "próximo passo").
+
+**Como foi feito:** cada mudança de comportamento com teste primeiro (falhando), depois a correção (passando). Resultado: 16 arquivos e 212 testes passando; typecheck e lint sem erros. `npm run build` não foi executado nesta rodada.
