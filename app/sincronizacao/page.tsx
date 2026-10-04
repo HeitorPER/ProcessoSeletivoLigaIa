@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { DisconnectButton } from '@/components/sync/DisconnectButton';
 import { SourcesTable } from '@/components/sync/SourcesTable';
 import { SyncNowButton } from '@/components/sync/SyncNowButton';
@@ -17,7 +18,9 @@ const ERRORS: Record<string, string> = {
   negado: 'O acesso não foi autorizado na tela do Google.',
 };
 
-export default async function SincronizacaoPage({ searchParams }: { searchParams: Promise<{ erro?: string; conectado?: string }> }) {
+export const metadata: Metadata = { title: 'Estado da sincronização' };
+
+export default async function SincronizacaoPage({ searchParams }: { searchParams: Promise<{ erro?: string; conectado?: string; desconectado?: string }> }) {
   const sp = await searchParams;
   const [state, conn, sources, runs] = await Promise.all([
     prisma.syncState.findUnique({ where: { id: 1 } }),
@@ -36,6 +39,9 @@ export default async function SincronizacaoPage({ searchParams }: { searchParams
     <>
       <PageHeader title="Estado da sincronização" description="De onde vêm os documentos, quando foram lidos pela última vez e o que não pôde ser processado." />
       {sp.conectado && <Notice tone="ok" live title="Conta Google conectada">A primeira sincronização começa em instantes.</Notice>}
+      {sp.desconectado && !conn.connected && (
+        <Notice tone="ok" live title="Conta desconectada">O acesso foi revogado e o texto em cache foi apagado. Atividades e histórico foram mantidos.</Notice>
+      )}
       {sp.erro && <Notice tone="error" live title="Conexão não concluída">{ERRORS[sp.erro] ?? 'Erro desconhecido.'}</Notice>}
 
       <section aria-labelledby="conexao" className="grid gap-6 md:grid-cols-2">
