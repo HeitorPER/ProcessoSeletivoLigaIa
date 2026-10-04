@@ -6,6 +6,32 @@ Todos os dados de teste (pessoas, atas, planilhas) são fictícios.
 
 Documentos do projeto: [`VALIDACAO.md`](VALIDACAO.md) (casos de teste e resultados), [`DIARIO_DE_BORDO.md`](DIARIO_DE_BORDO.md) (decisões e problemas), [`docs/superpowers/specs/2026-10-03-central-liga-ia-design.md`](docs/superpowers/specs/2026-10-03-central-liga-ia-design.md) (especificação de design).
 
+## Roteiro rápido para quem vai avaliar
+
+A aplicação roda na sua máquina, com **as suas** credenciais do Google e (opcionalmente) da OpenAI. Nada do autor é necessário: só o `.env` muda.
+
+1. **Pré-requisitos:** Node.js 22+ e acesso a `cdn.sheetjs.com` durante o `npm install` (detalhes na [seção 3](#3-requisitos-e-instalação)).
+2. **Google, cerca de 10 minutos** ([seção 4](#4-credenciais-do-google-e-pasta-do-drive)): projeto com a Google Drive API ativada; *Audience* **External** em **Testing**, com o seu e-mail em **Test users**; escopo `drive.readonly`; cliente **Web application** com o redirecionamento `http://localhost:3000/api/google/callback`.
+3. **Pasta:** crie uma pasta no seu Drive, coloque os arquivos de teste (os do pacote ou outros com a mesma estrutura) e copie o ID do fim da URL.
+4. **`.env`:** copie o `.env.example` e preencha `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DRIVE_TEST_FOLDER_ID` e um `TOKEN_ENC_KEY` aleatório. IA opcional: `AI_PROVIDER=openai` e `OPENAI_API_KEY` (a conta da API precisa ter créditos); sem isso, o modo por regras funciona sem custo.
+5. **Comandos** (um por linha):
+
+   ```bash
+   npm install
+   npm run setup
+   npm run dev
+   ```
+
+6. Abra <http://localhost:3000/sincronizacao> e clique em **Conectar conta Google**. A tela "o Google não verificou este app" é esperada no modo Testing: clique em **Continuar**.
+7. Arquivos novos ou editados na pasta aparecem em até 2 minutos sem clicar em nada (medido: 1 min 16 s para uma edição), ou na hora com **Sincronizar agora**.
+
+Problemas comuns:
+
+- *"Acesso bloqueado: o app não concluiu o processo de verificação"*: o e-mail usado no login não está em **Test users**.
+- *`redirect_uri_mismatch`*: o redirecionamento cadastrado difere de `GOOGLE_REDIRECT_URI` (porta, caminho ou barra final).
+- *Análise da ata falhou com `429`*: a conta da API da OpenAI está sem créditos. Use `AI_PROVIDER=none` ou adicione créditos.
+- *Trocou o `DRIVE_TEST_FOLDER_ID`*: a sincronização pausa com um aviso, para não misturar as pastas. Pare o app, rode `npm run db:reset` e suba de novo.
+
 ## Sumário
 
 1. [Arquitetura em linguagem simples](#1-arquitetura-em-linguagem-simples)
@@ -165,6 +191,7 @@ Resumo de `03_Dados_de_Teste/LEIA_ME_PRIMEIRO.md`. Os mesmos arquivos estão em 
 - **Texto em cache apagado (desconectar a conta ou arquivo que volta da lixeira):** a próxima varredura completa (ou o primeiro ciclo depois de reconectar) baixa o arquivo de novo. Se o conteúdo é o mesmo que já foi analisado **e a classificação com o `INDEX.md` atual é a mesma já gravada** (tipo, data da reunião, aba do registro), a aplicação só restaura o texto: não chama a IA e não cria nem substitui sugestões. Se o `INDEX.md` mudou nesse meio-tempo e a classificação mudou (por exemplo, uma ata que passou a ser "superada" ou uma planilha que deixou de ser o registro), o arquivo é processado por inteiro; planilhas só restauradas no mesmo ciclo de uma mudança no `INDEX.md` ainda passam pela reavaliação. Se o conteúdo mudou, o arquivo é processado como uma edição comum.
 - **Ata editada:** as sugestões pendentes da versão anterior viram "substituída" só depois que a nova análise termina com sucesso; as já aceitas continuam no histórico.
 - **Falha nunca vira "vazio":** erro de download, de leitura ou da IA marca a fonte com "erro" e o motivo, mantém o estado anterior e tenta de novo no próximo ciclo. Erros 429/5xx/timeout e 403 por limite de taxa têm até 5 novas tentativas (6 no total) com espera de 2, 4, 8, 16 e 32 s. Chamadas ao OpenAI têm tempo limite de 60 s e uma nova tentativa; a falha vira "erro" da fonte com a mensagem "Falha ao chamar o modelo: …" (sem a chave).
+- **Pasta configurada trocada:** se o `DRIVE_TEST_FOLDER_ID` muda depois de o banco já ter sincronizado outra pasta, o worker não sincroniza e mostra "A pasta configurada (DRIVE_TEST_FOLDER_ID) mudou…". Nada é apagado automaticamente: para começar com a pasta nova, pare o app e rode `npm run db:reset`; para continuar com a anterior, restaure o ID antigo. Sem isso, a planilha da pasta nova seria tratada como homônima da importada.
 - **Token expirado ou revogado:** o estado vira "Reconexão com o Google necessária"; as atividades continuam visíveis.
 - O indicador no cabeçalho mostra o estado em texto ("Sincronizado há 3 min", "Falha na sincronização", "Sincronizador parado", "Desconectado do Drive").
 
@@ -201,11 +228,12 @@ Preço do GPT-6 Luna consultado em 2026-10-03: **US$ 0,10 por 1 milhão de token
 
 | Operação | Estimativa | Custo |
 | --- | --- | --- |
-| Analisar uma ata | ~3 mil tokens de entrada + ~0,5 mil de saída | ~US$ 0,0006 |
-| Resumo pessoal | ~1 mil de entrada + ~0,2 mil de saída | ~US$ 0,0002 |
+| Analisar uma ata (medido: atas de 03/10 e 04/10) | 1.150–1.180 tokens de entrada + 240–400 de saída (inclui até 263 de raciocínio) | ~US$ 0,0003 |
+| Resumo pessoal (medido) | ~160 tokens de entrada + ~70 de saída | ~US$ 0,00005 |
 | Demonstração completa (poucas atas e alguns resumos) | | menos de US$ 0,01 |
+| Uso contínuo estimado: 20 atas e 200 resumos por mês | | ~US$ 0,02 por mês |
 
-São estimativas por ordem de grandeza (não medimos tokens reais com a API; a verificação local e os testes automatizados foram feitos sem chamar o OpenAI). O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
+Valores medidos em 2026-10-04 com o campo `usage` que a API devolve, usando o mesmo prompt da aplicação e as atas do pacote. Atas maiores ou uma lista de atividades maior aumentam a entrada de forma proporcional. O tamanho real depende do tamanho da ata e da lista de atividades enviada junto. A Drive API não tem custo dentro das cotas padrão. Com `AI_PROVIDER=none` o custo é zero.
 
 ## 10. Testes
 
@@ -213,13 +241,14 @@ São estimativas por ordem de grandeza (não medimos tokens reais com a API; a v
 npm test
 ```
 
-Resultado da última execução (2026-10-04, depois da validação no Drive real): **16 arquivos, 229 testes passando**; `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run lint` sem erros. `npm run build` não foi executado nessa rodada. Os testes usam um banco SQLite descartável (`prisma/test.db`) e os arquivos reais do pacote em `tests/fixtures`. Eles cobrem: extratores (`.md`, `.xlsx`, front-matter, Google Docs); parser do `INDEX.md` e classificação (incluindo a planilha homônima vazia); importação inicial (4 atividades, `ACT-104` com dois donos, `ACT-103` bloqueada); diferença da planilha; validação da saída da IA; modo por regras nas atas de 03/10 e 04/10; provedor OpenAI com cliente simulado; idempotência (mesmo arquivo duas vezes, aprovação duas vezes); ciclo de sincronização com Drive simulado (novo, editado, renomeado, removido, lixeira e restaurado, falha temporária, 403 por limite de taxa ou cota × permissão, texto em cache apagado e restaurado sem reanálise, restauração com `INDEX.md` alterado que reclassifica, token revogado, trava de concorrência); ata antiga que não reverte decisão humana posterior (e ata que corrige a própria proposta aceita sem ajuste; ata sem data); criação, edição e revisão de atividades; permissões de revisão; "o que mudou" para Ana e Davi; rotas de revisão (403/200/409, incluindo conflito sem texto da planilha).
+Resultado da última execução (2026-10-04, depois da validação no Drive real): **16 arquivos, 231 testes passando**; `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run lint` sem erros. `npm run build` não foi executado nessa rodada. Os testes usam um banco SQLite descartável (`prisma/test.db`) e os arquivos reais do pacote em `tests/fixtures`. Eles cobrem: extratores (`.md`, `.xlsx`, front-matter, Google Docs); parser do `INDEX.md` e classificação (incluindo a planilha homônima vazia); importação inicial (4 atividades, `ACT-104` com dois donos, `ACT-103` bloqueada); diferença da planilha; validação da saída da IA; modo por regras nas atas de 03/10 e 04/10; provedor OpenAI com cliente simulado; idempotência (mesmo arquivo duas vezes, aprovação duas vezes); ciclo de sincronização com Drive simulado (novo, editado, renomeado, removido, lixeira e restaurado, falha temporária, 403 por limite de taxa ou cota × permissão, texto em cache apagado e restaurado sem reanálise, restauração com `INDEX.md` alterado que reclassifica, token revogado, trava de concorrência); ata antiga que não reverte decisão humana posterior (e ata que corrige a própria proposta aceita sem ajuste; ata sem data); criação, edição e revisão de atividades; permissões de revisão; "o que mudou" para Ana e Davi; rotas de revisão (403/200/409, incluindo conflito sem texto da planilha).
 
 O que **não** é coberto por testes automatizados: chamadas reais ao Google Drive e ao OpenAI, interface no navegador (teclado, 375 px). Esses casos estão no registro de validação, com o status real de cada um: [`VALIDACAO.md`](VALIDACAO.md).
 
 ## 11. Limitações conhecidas
 
-- **A validação ponta a ponta com o Google Drive real ainda não foi executada.** Toda a lógica de sincronização foi testada com um Drive simulado e os arquivos do pacote carregados pelo mesmo código de ingestão. O passo a passo para executar com a pasta real está em `VALIDACAO.md`.
+- **Validação com o Drive real feita em uma conta e uma pasta de teste** (2026-10-04, ver `VALIDACAO.md`). Não foram testados arquivos grandes, pastas com milhares de itens, leitores de tela nem uso simultâneo por várias pessoas.
+- **Uma pasta por banco:** trocar o `DRIVE_TEST_FOLDER_ID` pausa a sincronização até o banco ser recriado (`npm run db:reset`).
 - **Identidade de demonstração sem senha:** o seletor "Vendo como" é só para demonstrar papéis. Qualquer pessoa com acesso à aplicação pode se passar por qualquer membro.
 - **Um único token Google** (a conta do operador) serve a todos os usuários da aplicação.
 - **Permissões por arquivo não são verificadas por usuário:** quem usa a aplicação vê trechos de qualquer arquivo da pasta, mesmo que não tivesse acesso a ele no Drive.
@@ -260,9 +289,10 @@ O que **não** é coberto por testes automatizados: chamadas reais ao Google Dri
 
 **Decisões que mudei depois de verificar saídas incorretas:**
 
-1. **Datas confundidas dentro de outras (achado de revisão de código).** Na revisão do código gerado pela IA de desenvolvimento, encontrei que a checagem "a data aparece no trecho" aceitava `7/10` dentro de `17/10`. Não foi uma saída observada do modelo: foi um defeito no código que deixaria passar, como "confirmada pelo trecho", uma data errada que o modelo viesse a propor. Troquei por uma checagem com fronteira de dígitos, com teste dedicado (`dateMentioned exige limites de dígitos`).
-2. **Mudanças falsas no "próximo passo" (saída incorreta observada).** Ao comparar o "próximo passo" proposto a partir da ata de 01/10 com o oficial, apareceram "mudanças" que eram só paráfrases ("revisar o material de entrada…" × "Revisar material…"). Passei a usar comparação tolerante para propostas (`sameFieldValue`: ignora markdown, aspas tipográficas, espaços e diferenças pequenas), mantendo a comparação estrita para edições humanas, que sempre entram no histórico.
-3. **Atalhos do plano que perdiam análise em silêncio.** O plano original tinha um atalho "ata de origem do registro, sem análise" e mandava substituir as sugestões antigas *antes* de extrair a nova versão. Ao conferir o comportamento, percebi que o primeiro poderia dispensar a análise de atas novas citadas como "Origem" e que o segundo apagaria a fila de revisão se a IA falhasse. Redesenhei: o atalho só vale para atividades da importação inicial, e as sugestões antigas só são substituídas depois de uma extração bem-sucedida.
-4. **Edições da planilha empilhando sugestões contraditórias.** O diff original comparava cada versão com a anterior e gerava propostas que se contradiziam. Passei a comparar com a base da importação (ou da atividade aceita), com deduplicação sem versão e substituição por alvo.
+1. **Evidência com uma frase pulada (saída incorreta observada no GPT-6 Luna, no Drive real).** Na ata de 03/10 em `.md`, o modelo citou a 1ª e a 3ª frase de um parágrafo como se fossem um trecho só, pulando a do meio, nas duas tentativas. Como a evidência deixou de ser literal, a validação descartou a sugestão, e o descarte só aparecia no log. Mudei três coisas: o prompt passou a pedir um trecho contínuo, sem pular frases (em 3 de 3 novas tentativas o modelo citou o parágrafo inteiro); a validação aceita frases literais na ordem e na mesma seção, marcando o corte com `[…]` e uma incerteza; e todo item recusado aparece em "Trechos sem decisão" com o motivo.
+2. **Datas confundidas dentro de outras (achado de revisão de código).** Na revisão do código gerado pela IA de desenvolvimento, encontrei que a checagem "a data aparece no trecho" aceitava `7/10` dentro de `17/10`. Não foi uma saída observada do modelo: foi um defeito no código que deixaria passar, como "confirmada pelo trecho", uma data errada que o modelo viesse a propor. Troquei por uma checagem com fronteira de dígitos, com teste dedicado (`dateMentioned exige limites de dígitos`).
+3. **Mudanças falsas no "próximo passo" (saída incorreta observada).** Ao comparar o "próximo passo" proposto a partir da ata de 01/10 com o oficial, apareceram "mudanças" que eram só paráfrases ("revisar o material de entrada…" × "Revisar material…"). Passei a usar comparação tolerante para propostas (`sameFieldValue`: ignora markdown, aspas tipográficas, espaços e diferenças pequenas), mantendo a comparação estrita para edições humanas, que sempre entram no histórico.
+4. **Atalhos do plano que perdiam análise em silêncio.** O plano original tinha um atalho "ata de origem do registro, sem análise" e mandava substituir as sugestões antigas *antes* de extrair a nova versão. Ao conferir o comportamento, percebi que o primeiro poderia dispensar a análise de atas novas citadas como "Origem" e que o segundo apagaria a fila de revisão se a IA falhasse. Redesenhei: o atalho só vale para atividades da importação inicial, e as sugestões antigas só são substituídas depois de uma extração bem-sucedida.
+5. **Edições da planilha empilhando sugestões contraditórias.** O diff original comparava cada versão com a anterior e gerava propostas que se contradiziam. Passei a comparar com a base da importação (ou da atividade aceita), com deduplicação sem versão e substituição por alvo.
 
 Outras correções estão no diário (aspas tipográficas trocadas em uma expressão regular, verificação do nome do modelo na documentação da OpenAI, entre outras).

@@ -122,6 +122,9 @@ async function processFileSafely(deps: SyncDeps, file: DriveFileWithPath, force 
   }
 }
 
+export const FOLDER_CHANGED_MESSAGE =
+  'A pasta configurada (DRIVE_TEST_FOLDER_ID) mudou desde a última sincronização. A sincronização está pausada para não misturar as atividades da pasta anterior com as da nova. Para começar com a pasta nova: pare o app (Ctrl+C), rode npm run db:reset e depois npm run dev. Para voltar à pasta anterior, restaure o DRIVE_TEST_FOLDER_ID antigo.';
+
 export async function runCycle(deps: SyncDeps, requested: SyncMode): Promise<SyncRunSummary> {
   const now = deps.now ?? (() => new Date());
   await prisma.syncState.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
@@ -137,6 +140,9 @@ export async function runCycle(deps: SyncDeps, requested: SyncMode): Promise<Syn
   const run = await prisma.syncRun.create({ data: { mode } });
 
   try {
+    // O banco guarda a autoridade e a importação inicial da pasta anterior: misturar as pastas faria a planilha
+    // da nova ser tratada como homônima. Pausa antes de qualquer chamada ao Drive e explica como recomeçar.
+    if (state.folderId && state.folderId !== deps.rootFolderId) throw new Error(FOLDER_CHANGED_MESSAGE);
     let token = state.startPageToken;
     let folderName = state.folderName;
     if (mode === 'initial') {

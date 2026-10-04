@@ -97,6 +97,22 @@ describe('ciclo de sincronização', () => {
     expect(docx!.statusReason).toContain('Google Docs');
   });
 
+  it('pasta configurada trocada: pausa sem tocar no Drive nem nas atividades e explica como recomeçar', async () => {
+    const before = await prisma.activity.count();
+    const other = new FakeDrive();
+    other.add(folder('outra', 'Outra pasta', []));
+    other.add(file('reg2', 'Ata_registro.xlsx', fx('01_CARGA_INICIAL/Ata_registro.xlsx'), { parents: ['outra'] }));
+    const out = await runCycle({ ...depsFor(other), rootFolderId: 'outra' }, 'full');
+    expect(out.error).toContain('A pasta configurada (DRIVE_TEST_FOLDER_ID) mudou');
+    expect(out.error).toContain('npm run db:reset');
+    expect(out).toMatchObject({ processed: 0, unavailable: 0 });
+    expect(await prisma.source.findUnique({ where: { fileId: 'reg2' } })).toBeNull();
+    expect(await prisma.activity.count()).toBe(before);
+    const state = await prisma.syncState.findUnique({ where: { id: 1 } });
+    expect(state).toMatchObject({ folderId: ROOT, status: 'error', runningSince: null });
+    expect(await prisma.source.count({ where: { syncStatus: 'unavailable' } })).toBe(0);
+  });
+
   it('arquivo novo via changes vira sugestão; o mesmo evento duas vezes não duplica', async () => {
     drive.add(file('ata04', 'Ata_2026-10-04.md', fx('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-04.md'), { parents: ['sub'] }));
     drive.change('ata04');
@@ -265,6 +281,20 @@ describe('ciclo de sincronização', () => {
     const src = await prisma.source.findUnique({ where: { fileId: 'Ata_2026-10-01.md' } });
     expect(src!.syncStatus).toBe('unavailable');
     expect(src!.statusReason).toContain('fora da pasta');
+  });
+
+  it('Google Doc movido de fora para dentro da pasta (subpasta) é detectado pelo changes e analisado', async () => {
+    drive.add(folder('fora', 'Rascunhos', []));
+    drive.add(file('gdoc03', 'Ata_2026-10-03', null, { mimeType: GDOC_MIME, md5Checksum: null, parents: ['fora'], exportText: fx('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md').toString('utf8') }));
+    await runCycle(depsFor(drive), 'incremental');
+    expect(await prisma.source.findUnique({ where: { fileId: 'gdoc03' } })).toBeNull(); // fora da pasta: ignorado
+
+    drive.add({ ...drive.files.get('gdoc03')!, parents: ['sub'] }); // movido para a subpasta "Atas"
+    drive.change('gdoc03');
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r).toMatchObject({ processed: 1, errors: 0 });
+    expect(await prisma.source.findUnique({ where: { fileId: 'gdoc03' } })).toMatchObject({ kind: 'minutes', syncStatus: 'processed', path: 'LIA case teste/Atas' });
+    expect(await prisma.suggestion.count({ where: { sourceFileId: 'gdoc03', kind: 'update', targetActivityId: 'ACT-101', reviewStatus: 'pending' } })).toBe(1);
   });
 
   it('mudança no INDEX reavalia as planilhas não modificadas, uma vez cada', async () => {

@@ -10,7 +10,7 @@ Este arquivo registra o que foi testado, como e com que resultado. Ele separa tr
 
 | Comando | Resultado |
 | --- | --- |
-| `npm test` | 16 arquivos, **229 testes passando**, 0 falhas |
+| `npm test` | 16 arquivos, **231 testes passando**, 0 falhas |
 | `npm run lint` | sem erros |
 | `npm run typecheck` (`next typegen` + `tsc --noEmit`) | sem erros |
 | `npm run build` | não executado na revisão final nem na re-revisão (o servidor de desenvolvimento em uso compartilha a pasta `.next`); a última execução sem erros foi a da integração, em 2026-10-03, antes das correções finais |

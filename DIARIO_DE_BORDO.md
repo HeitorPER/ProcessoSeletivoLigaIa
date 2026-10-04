@@ -104,3 +104,16 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 - **Rolagem horizontal em 375 px.** Na verificação no navegador, `/sugestoes` passava de 375 px por causa de um caminho de pasta longo sem espaços, e `/minhas` e `/atividades` por 3 px (prazo e rótulo "Vence em…" sem quebra). Correção: o local da evidência pode quebrar dentro do caminho e o rótulo do prazo desce de linha; as 8 páginas cabem em 375 px.
 
 **Como foi feito:** teste primeiro (falhando), depois a correção. Resultado: 16 arquivos e 229 testes passando; typecheck e lint sem erros.
+
+## 2026-10-04 — Preparação da entrega
+
+**O que a banca respondeu:** a pessoa avaliadora vai rodar o projeto com o próprio cliente OAuth, a própria pasta e a própria chave de IA, mudando só o `.env`; durante a apresentação vai enviar arquivos novos com a mesma estrutura.
+
+**O que fiz:**
+- Conferi que nada fora do `.env` depende da minha conta (nenhum ID de pasta, e-mail ou URL fixa no código).
+- **Troca de pasta.** Achei um risco parecido com o do banco de demonstração: se o `DRIVE_TEST_FOLDER_ID` muda com o banco já usado, a planilha da pasta nova seria tratada como homônima da importada. Decisão (aprovada pelo usuário): pausar a sincronização com um aviso que explica como recomeçar (`npm run db:reset`), sem apagar nada automaticamente.
+- **Custo medido** com o campo `usage` da API: cerca de 1.150–1.180 tokens de entrada e 240–400 de saída por ata (~US$ 0,0003) e ~160/70 por resumo (~US$ 0,00005).
+- README com um roteiro rápido para quem vai avaliar e problemas comuns; limitação desatualizada ("Drive real não validado") corrigida; a decisão sobre a evidência com frase pulada entrou como primeiro exemplo de saída incorreta do modelo.
+- Teste novo para um Google Doc movido de fora para dentro da pasta (passo usado na demonstração).
+
+**Resultado:** 16 arquivos e 231 testes passando; typecheck e lint sem erros.
