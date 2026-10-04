@@ -17,7 +17,7 @@ function heading(s: SuggestionView): string {
 export function SuggestionCard({ s, members }: { s: SuggestionView; members: MemberInfo[] }) {
   const dateLabel = s.source.documentDate ? `documento de ${formatDateBR(s.source.documentDate)}` : `modificado em ${formatDateBR(toIsoDateSP(s.source.modifiedAt))}`;
   return (
-    <article id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-24 rounded border border-line p-4 md:p-5">
+    <article id={s.id} aria-labelledby={`${s.id}-h`} className="card scroll-mt-24">
       <div className="flex flex-wrap items-center gap-2">
         <h2 id={`${s.id}-h`} className="text-lg font-semibold">{heading(s)}</h2>
         <ReviewStatusBadge status={s.reviewStatus} />
@@ -35,7 +35,7 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
       <FieldDiffTable proposed={s.proposedFields} current={s.currentSnapshot} members={members} showCurrent={s.kind === 'update'} />
 
       <figure className="my-3 max-w-3xl">
-        <blockquote className="border-l-4 border-accent bg-surface px-4 py-2 italic">“{s.evidence.replace(/\*\*/g, '')}”</blockquote>
+        <blockquote className="rounded-2xl bg-canvas px-4 py-3 italic">“{s.evidence.replace(/\*\*/g, '')}”</blockquote>
         <figcaption className="mt-1 text-sm [overflow-wrap:anywhere]">
           <SourceLink name={s.source.name} href={s.source.webUrl} syncStatus={s.source.syncStatus} /> · {dateLabel}
           {s.evidenceLocator ? ` · ${s.evidenceLocator}` : ''}
@@ -44,7 +44,7 @@ export function SuggestionCard({ s, members }: { s: SuggestionView; members: Mem
 
       <p className="max-w-3xl"><span className="font-medium">Motivo: </span>{s.reason}</p>
       {s.uncertainties.length > 0 && (
-        <div className="mt-2 max-w-3xl rounded bg-warn-soft px-3 py-2">
+        <div className="mt-3 max-w-3xl rounded-2xl bg-warn-soft px-4 py-3">
           <p className="font-semibold text-warn">Incertezas para revisar</p>
           <ul className="list-disc pl-5">{s.uncertainties.map((u) => <li key={u}>{u}</li>)}</ul>
         </div>

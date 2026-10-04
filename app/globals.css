@@ -3,38 +3,239 @@
 @theme {
   --color-brand: #1433bd;
   --color-brand-dark: #0d2486;
+  --color-brand-soft: #e8ecfa;
+  --color-brand-soft-hover: #d8dff7;
+  --color-on-brand: #ffffff;
   --color-accent: #19dce3;
   --color-accent-soft: #d6f8f9;
   --color-ink: #0b0b14;
   --color-muted: #4a4f5c;
   --color-line: #d9dce3;
+  --color-hairline: #ecedf1;
   --color-surface: #f5f7fb;
+  --color-canvas: #f5f5f7;
+  --color-panel: #ffffff;
+  --color-raised: #ffffff;
+  --color-tint: rgb(0 0 0 / 0.05);
+  --color-tint-strong: rgb(0 0 0 / 0.09);
   --color-danger: #a4161a;
+  --color-danger-strong: #a4161a;
   --color-danger-soft: #fdecec;
+  --color-danger-soft-hover: #fadada;
   --color-warn: #7a4b00;
   --color-warn-soft: #fff4dc;
   --color-ok: #1e6b3a;
   --color-ok-soft: #e6f4ea;
+  --color-ok-soft-hover: #d5ecdc;
+  --color-card-border: transparent;
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px rgb(0 0 0 / 0.06);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Tema escuro: vale quando o sistema prefere escuro e a pessoa não escolheu "Claro", ou quando escolheu "Escuro"
+ * (atributo data-theme no <html>, gravado no navegador). Mantém as cores da Liga, com o azul mais claro para
+ * contraste ≥ 4,5:1 sobre o fundo escuro; botões azuis passam a ter texto escuro.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-brand: #8ea2ff;
+    --color-brand-dark: #a9b8ff;
+    --color-brand-soft: #1f2a55;
+    --color-brand-soft-hover: #283669;
+    --color-on-brand: #0b0b14;
+    --color-accent-soft: #0f3b3d;
+    --color-ink: #eef0f5;
+    --color-muted: #a3a9b8;
+    --color-line: #353a45;
+    --color-hairline: #272b34;
+    --color-surface: #1a1d24;
+    --color-canvas: #0f1115;
+    --color-panel: #1a1d24;
+    --color-raised: #2c313c;
+    --color-tint: rgb(255 255 255 / 0.07);
+    --color-tint-strong: rgb(255 255 255 / 0.12);
+    --color-danger: #ff8a8f;
+    --color-danger-soft: #3a1517;
+    --color-danger-soft-hover: #4a1b1e;
+    --color-warn: #f5c46b;
+    --color-warn-soft: #3a2c0f;
+    --color-ok: #7fd99a;
+    --color-ok-soft: #12301d;
+    --color-ok-soft-hover: #183d26;
+    --color-card-border: #262a33;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-brand: #8ea2ff;
+  --color-brand-dark: #a9b8ff;
+  --color-brand-soft: #1f2a55;
+  --color-brand-soft-hover: #283669;
+  --color-on-brand: #0b0b14;
+  --color-accent-soft: #0f3b3d;
+  --color-ink: #eef0f5;
+  --color-muted: #a3a9b8;
+  --color-line: #353a45;
+  --color-hairline: #272b34;
+  --color-surface: #1a1d24;
+  --color-canvas: #0f1115;
+  --color-panel: #1a1d24;
+  --color-raised: #2c313c;
+  --color-tint: rgb(255 255 255 / 0.07);
+  --color-tint-strong: rgb(255 255 255 / 0.12);
+  --color-danger: #ff8a8f;
+  --color-danger-soft: #3a1517;
+  --color-danger-soft-hover: #4a1b1e;
+  --color-warn: #f5c46b;
+  --color-warn-soft: #3a2c0f;
+  --color-ok: #7fd99a;
+  --color-ok-soft: #12301d;
+  --color-ok-soft-hover: #183d26;
+  --color-card-border: #262a33;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
 }
 
 html {
   color: var(--color-ink);
-  background: #ffffff;
+  background: var(--color-canvas);
+  accent-color: var(--color-brand);
 }
 body {
   font-size: 1rem;
   line-height: 1.6;
 }
+/* O contorno acompanha a forma do elemento (pílulas continuam pílulas com foco). */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--color-brand);
   outline-offset: 2px;
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 55%, transparent);
-  border-radius: 4px;
 }
-header :where(a, button, select):focus-visible {
-  outline-color: #ffffff;
+
+/*
+ * Visual "Apple": cards arredondados com sombra leve sobre fundo cinza, botões e etiquetas em pílula.
+ * As bordas transparentes deixam cards e botões visíveis no modo de alto contraste do Windows (que remove sombras e fundos).
+ */
+@layer components {
+  .card {
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .card {
+      padding: 1.5rem;
+    }
+  }
+  .card-list > * + * {
+    border-top: 1px solid var(--color-hairline);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    padding: 0.5rem 1.25rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
+    transition: background-color 150ms ease;
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .btn-sm {
+    min-height: 2rem;
+    padding: 0.25rem 0.875rem;
+    font-size: 0.875rem;
+  }
+  .btn-primary {
+    background: var(--color-brand);
+    color: var(--color-on-brand);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-brand-dark);
+  }
+  .btn-secondary {
+    background: var(--color-brand-soft);
+    color: var(--color-brand);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-brand-soft-hover);
+  }
+  .btn-neutral {
+    background: var(--color-tint);
+    color: var(--color-ink);
+  }
+  .btn-neutral:hover:not(:disabled) {
+    background: var(--color-tint-strong);
+  }
+  .btn-danger {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--color-danger-soft-hover);
+  }
+  .btn-danger-solid {
+    background: var(--color-danger-strong);
+    color: #ffffff;
+  }
+  .btn-ok {
+    background: var(--color-ok-soft);
+    color: var(--color-ok);
+  }
+  .btn-ok:hover:not(:disabled) {
+    background: var(--color-ok-soft-hover);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .field {
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+    background: var(--color-panel);
+    padding: 0.5rem 0.875rem;
+    color: var(--color-ink);
+  }
+  /* O select nativo ignora o arredondamento: aparência própria com a seta desenhada no fundo. */
+  select.field {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%234a4f5c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 0.875rem center;
+    background-repeat: no-repeat;
+    padding-right: 2.25rem;
+  }
 }
+
+/* Seta do select em cinza claro no tema escuro. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23a3a9b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+}
+:root[data-theme="dark"] select.field {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23a3a9b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

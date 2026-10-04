@@ -117,3 +117,13 @@ Registro informal de como o trabalho foi conduzido: decisões, mudanças de dire
 - Teste novo para um Google Doc movido de fora para dentro da pasta (passo usado na demonstração).
 
 **Resultado:** 16 arquivos e 231 testes passando; typecheck e lint sem erros.
+
+## 2026-10-04 — Novo visual e tema escuro
+
+**O que o usuário pediu:** um visual mais limpo, no estilo da Apple: cards arredondados com sombra leve, botões arredondados, "Comece aqui" dividido em módulos, as novidades de cada categoria dentro de um card e um tema claro/escuro. Como referência de formatos e tamanhos (sem copiar cores nem ícones), uma barra lateral com itens de cantos suaves e a troca de tema no rodapé.
+
+**Decisões (aprovadas pelo usuário a partir de uma maquete):** fundo cinza claro com cards brancos; botões secundários com preenchimento suave; cabeçalho branco translúcido. O tema escuro segue o sistema até a pessoa escolher "Claro" ou "Escuro", e a escolha fica no navegador.
+
+**Como foi feito:** em vez de trocar classes página a página, criei estilos compartilhados em `app/globals.css` (`card`, `btn-*`, `pill`, `field`) e tokens semânticos (`panel`, `tint`, `raised`, `on-brand`) que o tema escuro redefine. Um script no `<head>` aplica a escolha antes da pintura, para não piscar o tema errado. Bordas transparentes mantêm cards e botões visíveis no modo de alto contraste do Windows.
+
+**Verificação:** auditoria automática de contraste nos dois temas (nenhum texto abaixo de 4,5:1), 8 páginas em 375 px sem rolagem horizontal, foco por teclado e troca de tema por teclado. Testes: 231 passando; typecheck e lint sem erros.

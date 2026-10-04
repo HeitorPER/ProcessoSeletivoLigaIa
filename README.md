@@ -73,7 +73,7 @@ Só o **worker** conversa com o Drive. O Next.js só lê e grava no banco. O bot
 | `lib/activities` | Criar, editar, aprovar e rejeitar atividades, sempre com evento de histórico (autor, antes/depois, motivo, fonte) |
 | `lib/google`, `lib/summary`, `lib/suggestions` | OAuth e criptografia do token; "o que mudou para mim"; consultas da fila de revisão |
 | `worker/` | Processo separado com o laço de sincronização (verifica a cada 5 s se há trabalho) |
-| `app/`, `components/` | Páginas e rotas `/api` do Next.js; componentes de interface |
+| `app/`, `components/` | Páginas e rotas `/api` do Next.js; componentes de interface. O visual (cards arredondados, botões em pílula, temas claro e escuro) vem de estilos compartilhados em `app/globals.css`; o tema segue o sistema até a pessoa escolher "Claro" ou "Escuro" na barra lateral |
 | `prisma/` | Esquema, migrações e semente (4 membros fictícios) |
 | `tests/` | Vitest, com os arquivos do pacote de teste em `tests/fixtures` |
 

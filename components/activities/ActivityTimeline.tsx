@@ -7,7 +7,7 @@ const TYPE_LABELS: Record<string, string> = { import: 'Importação', create: 'C
 export function ActivityTimeline({ events }: { events: ActivityEventView[] }) {
   if (!events.length) return <p className="text-muted">Sem histórico.</p>;
   return (
-    <ol className="space-y-4 border-l-2 border-line pl-4">
+    <ol className="space-y-4 border-l-2 border-brand-soft pl-4">
       {events.map((e) => (
         <li key={e.id}>
           <p className="text-sm text-muted">

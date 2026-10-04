@@ -20,7 +20,7 @@ export default async function TodasAtividadesPage({ searchParams }: { searchPara
       <PageHeader
         title="Todas as atividades"
         description="Painel de todas as atividades da Liga. Filtre por responsável, frente, estado e prazo."
-        actions={<Link href="/atividades/nova" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">Nova atividade</Link>}
+        actions={<Link href="/atividades/nova" className="btn btn-primary">Nova atividade</Link>}
       />
       <ActivityFilters values={values} members={members} basePath="/atividades" showOwner />
       <p className="mb-3 text-sm text-muted" role="status">{items.length} atividade{items.length === 1 ? '' : 's'} encontrada{items.length === 1 ? '' : 's'}</p>

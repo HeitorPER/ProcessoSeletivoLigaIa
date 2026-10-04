@@ -44,10 +44,10 @@ export default async function SincronizacaoPage({ searchParams }: { searchParams
       )}
       {sp.erro && <Notice tone="error" live title="Conexão não concluída">{ERRORS[sp.erro] ?? 'Erro desconhecido.'}</Notice>}
 
-      <section aria-labelledby="conexao" className="grid gap-6 md:grid-cols-2">
-        <div>
+      <section aria-labelledby="conexao" className="grid gap-5 md:grid-cols-2">
+        <div className="card">
           <h2 id="conexao" className="text-xl font-semibold">Pasta conectada</h2>
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 [overflow-wrap:anywhere]">
             <dt className="font-medium">Pasta</dt>
             <dd>{folderId ? <a href={`https://drive.google.com/drive/folders/${folderId}`} target="_blank" rel="noopener noreferrer" className="text-brand underline">{state?.folderName ?? 'Abrir no Drive'}<span className="sr-only"> (abre no Google Drive)</span></a> : <span className="text-danger">Não configurada (DRIVE_TEST_FOLDER_ID)</span>}</dd>
             <dt className="font-medium">Conta</dt>
@@ -58,15 +58,15 @@ export default async function SincronizacaoPage({ searchParams }: { searchParams
             <dd>{provider === RULES_PROVIDER_NAME ? 'Desativada — extração por regras' : provider}</dd>
           </dl>
           <div className="mt-4 flex flex-wrap gap-3">
-            {isGoogleConfigured() && <a href="/api/google/connect" className="rounded border border-brand px-4 py-2 font-semibold text-brand">{conn.connected ? 'Reconectar conta Google' : 'Conectar conta Google'}</a>}
+            {isGoogleConfigured() && <a href="/api/google/connect" className={`btn ${conn.connected ? 'btn-secondary' : 'btn-primary'}`}>{conn.connected ? 'Reconectar conta Google' : 'Conectar conta Google'}</a>}
             {conn.connected && <DisconnectButton />}
           </div>
         </div>
-        <div>
+        <div className="card">
           <h2 className="text-xl font-semibold">Situação</h2>
           <p className={`mt-2 font-semibold ${status.tone === 'error' ? 'text-danger' : status.tone === 'warn' ? 'text-warn' : 'text-ok'}`}>{status.label}</p>
           {status.detail && <p className="text-sm">{status.detail}</p>}
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[15px]">
+          <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[15px] [overflow-wrap:anywhere]">
             <dt className="font-medium">Último sucesso</dt><dd>{state?.lastSuccessAt ? formatDateTimeBR(state.lastSuccessAt) : '—'}</dd>
             <dt className="font-medium">Última falha</dt><dd>{state?.lastErrorAt ? `${formatDateTimeBR(state.lastErrorAt)} — ${state.lastError ?? ''}` : '—'}</dd>
             <dt className="font-medium">Próximo ciclo</dt><dd>{state?.nextRunAt ? formatDateTimeBR(state.nextRunAt) : '—'}</dd>
@@ -76,16 +76,16 @@ export default async function SincronizacaoPage({ searchParams }: { searchParams
         </div>
       </section>
 
-      <section aria-labelledby="contagem" className="mt-8">
+      <section aria-labelledby="contagem" className="card mt-5">
         <h2 id="contagem" className="text-xl font-semibold">Arquivos</h2>
         <p className="mt-1">Processados: <strong>{count('processed')}</strong> · Ignorados: <strong>{count('ignored')}</strong> · Com erro: <strong>{count('error')}</strong> · Indisponíveis: <strong>{count('unavailable')}</strong></p>
         <div className="mt-3"><SourcesTable rows={sources} /></div>
       </section>
 
-      <section aria-labelledby="execucoes" className="mt-8">
+      <section aria-labelledby="execucoes" className="card mt-5">
         <h2 id="execucoes" className="text-xl font-semibold">Últimas execuções</h2>
         {runs.length === 0 ? <p className="text-muted">Nenhuma execução ainda.</p> : (
-          <ul className="mt-2 space-y-1 text-[15px]">
+          <ul className="card-list mt-2 text-[15px] [&>li]:py-2">
             {runs.map((r) => (
               <li key={r.id}>{formatDateTimeBR(r.startedAt)} · {r.mode} · {r.processed} processados, {r.ignored} ignorados, {r.errors} com erro, {r.unavailable} indisponíveis, {r.unchanged} sem mudança{r.error ? <span className="text-danger"> — falha: {r.error}</span> : ''}</li>
             ))}

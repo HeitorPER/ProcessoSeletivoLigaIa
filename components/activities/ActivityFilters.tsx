@@ -2,11 +2,11 @@ import Link from 'next/link';
 import type { FilterValues } from '@/lib/activities/filters';
 import { ACTIVITY_STATUSES, FRONTS, STATUS_LABELS, type MemberInfo } from '@/lib/types';
 
-const sel = 'mt-1 block w-full rounded border border-line bg-white px-2 py-2';
+const sel = 'field mt-1 block w-full';
 
 export function ActivityFilters({ values, members, basePath, showOwner }: { values: FilterValues; members: MemberInfo[]; basePath: string; showOwner: boolean }) {
   return (
-    <form method="get" action={basePath} role="search" aria-label="Filtrar atividades" className="mb-6 grid gap-3 rounded border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
+    <form method="get" action={basePath} role="search" aria-label="Filtrar atividades" className="card mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {showOwner && (
         <div>
           <label htmlFor="f-responsavel" className="text-sm font-medium">Responsável</label>
@@ -41,8 +41,8 @@ export function ActivityFilters({ values, members, basePath, showOwner }: { valu
         </select>
       </div>
       <div className="flex items-end gap-3">
-        <button type="submit" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">Aplicar filtros</button>
-        <Link href={basePath} className="py-2 text-brand underline">Limpar</Link>
+        <button type="submit" className="btn btn-primary">Aplicar filtros</button>
+        <Link href={basePath} className="btn btn-neutral">Limpar</Link>
       </div>
     </form>
   );

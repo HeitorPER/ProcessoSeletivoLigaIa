@@ -1,7 +1,7 @@
 'use client';
 import { ACTIVITY_STATUSES, FRONTS, STATUS_LABELS, type ActivityFields, type MemberInfo } from '@/lib/types';
 
-const input = 'mt-1 block w-full rounded border border-line bg-white px-3 py-2 text-ink';
+const input = 'field mt-1 block w-full';
 
 export function ActivityFieldsFieldset({ value, onChange, members, idPrefix }: { value: ActivityFields; onChange: (v: ActivityFields) => void; members: MemberInfo[]; idPrefix: string }) {
   const set = <K extends keyof ActivityFields>(k: K, v: ActivityFields[K]) => onChange({ ...value, [k]: v });

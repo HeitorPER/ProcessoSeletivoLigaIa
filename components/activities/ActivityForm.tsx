@@ -38,9 +38,9 @@ export function ActivityForm({ mode, activityId, initial, members }: { mode: 'cr
   }
 
   return (
-    <form onSubmit={submit} noValidate className="max-w-3xl space-y-6">
+    <form onSubmit={submit} noValidate className="card max-w-3xl space-y-6">
       {errors.length > 0 && (
-        <div ref={errorRef} tabIndex={-1} role="alert" className="rounded border-l-4 border-danger bg-danger-soft px-4 py-3">
+        <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-2xl border border-transparent bg-danger-soft px-4 py-3">
           <p className="font-semibold">Corrija antes de salvar:</p>
           <ul className="list-disc pl-5">{errors.map((er) => <li key={er}>{er}</li>)}</ul>
         </div>
@@ -49,14 +49,14 @@ export function ActivityForm({ mode, activityId, initial, members }: { mode: 'cr
       {mode === 'edit' && (
         <div>
           <label htmlFor="atividade-motivo" className="font-medium">Motivo da alteração (opcional, vai para o histórico)</label>
-          <input id="atividade-motivo" className="mt-1 block w-full rounded border border-line px-3 py-2" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <input id="atividade-motivo" className="field mt-1 block w-full" value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
       )}
       <div className="flex gap-3">
-        <button type="submit" disabled={saving} className="rounded bg-brand px-5 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+        <button type="submit" disabled={saving} className="btn btn-primary">
           {saving ? 'Salvando…' : mode === 'create' ? 'Criar atividade' : 'Salvar alterações'}
         </button>
-        <button type="button" onClick={() => router.back()} className="rounded border border-line px-5 py-2">Cancelar</button>
+        <button type="button" onClick={() => router.back()} className="btn btn-neutral">Cancelar</button>
       </div>
     </form>
   );

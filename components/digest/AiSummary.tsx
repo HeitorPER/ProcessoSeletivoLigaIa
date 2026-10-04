@@ -19,9 +19,9 @@ export function AiSummary({ since, enabled }: { since: string; enabled: boolean 
   if (!enabled) return <p className="text-sm text-muted">Resumo por IA desativado — os itens abaixo vêm diretamente dos registros.</p>;
   const current = result?.since === since ? result : null;
   return (
-    <section aria-labelledby="resumo-ia" className="rounded border-l-4 border-accent bg-surface px-4 py-3">
-      <h2 id="resumo-ia" className="text-sm font-semibold uppercase tracking-wide text-muted">Resumo gerado por IA — confira nos itens abaixo</h2>
-      <p aria-live="polite" className="mt-1">
+    <section aria-labelledby="resumo-ia" className="card">
+      <h2 id="resumo-ia"><span className="pill whitespace-normal bg-accent-soft text-ink">Resumo gerado por IA — confira nos itens abaixo</span></h2>
+      <p aria-live="polite" className="mt-3">
         {!current && 'Gerando resumo…'}
         {current?.status === 'done' && current.text}
         {current?.status === 'error' && 'Resumo por IA indisponível agora. Os itens abaixo continuam corretos.'}

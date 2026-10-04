@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 
 function inline(text: string): React.ReactNode[] {
   return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean).map((part, i) => {
-    if (part.startsWith('`')) return <code key={i} className="rounded bg-surface px-1 text-[0.95em]">{part.slice(1, -1)}</code>;
+    if (part.startsWith('`')) return <code key={i} className="rounded-md bg-tint px-1.5 text-[0.95em]">{part.slice(1, -1)}</code>;
     if (part.startsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
     return <Fragment key={i}>{part}</Fragment>;
   });

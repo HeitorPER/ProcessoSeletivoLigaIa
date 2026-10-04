@@ -7,7 +7,7 @@ export function SourceLink({ name, href, syncStatus }: { name: string; href: str
         <span aria-hidden="true"> ↗</span>
         <span className="sr-only"> (abre no Google Drive em nova aba)</span>
       </a>
-      {unavailable && <span className="rounded bg-warn-soft px-1 text-sm font-medium text-warn">{syncStatus === 'error' ? 'com erro' : 'indisponível'}</span>}
+      {unavailable && <span className="pill bg-warn-soft py-0 text-warn">{syncStatus === 'error' ? 'com erro' : 'indisponível'}</span>}
     </span>
   );
 }

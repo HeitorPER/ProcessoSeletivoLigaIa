@@ -26,18 +26,18 @@ export default async function ComeceAquiPage() {
         </Notice>
       )}
 
-      <ol className="space-y-8">
-        <li>
-          <h2 className="text-xl font-semibold">1. O que é a Liga</h2>
-          {o.purpose.provisional && <p className="mt-1 inline-block rounded bg-warn-soft px-2 text-sm font-medium text-warn">Provisório{o.purpose.confirmBy ? ` — a confirmar por ${o.purpose.confirmBy}` : ''}</p>}
+      <ol className="space-y-5">
+        <li className="card">
+          <h2 className="flex items-center gap-3 text-xl font-semibold"><span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-base text-brand">1</span><span className="sr-only">1. </span>O que é a Liga</h2>
+          {o.purpose.provisional && <p className="pill mt-3 bg-warn-soft text-warn">Provisório{o.purpose.confirmBy ? ` — a confirmar por ${o.purpose.confirmBy}` : ''}</p>}
           {o.purpose.text ? <MarkdownText text={o.purpose.text} /> : <p className="text-muted">Texto de propósito ainda não disponível.</p>}
           {o.purpose.source && <p className="text-sm">Fonte: <SourceLink name={o.purpose.source.name} href={o.purpose.source.webUrl} syncStatus={o.purpose.source.available ? undefined : 'unavailable'} /></p>}
           <h3 className="mt-4 text-lg font-semibold">Frentes e pessoas</h3>
           {o.fronts.text ? <MarkdownText text={o.fronts.text} /> : <p className="text-muted">Frentes ainda não disponíveis.</p>}
         </li>
 
-        <li>
-          <h2 className="text-xl font-semibold">2. Como trabalhamos</h2>
+        <li className="card">
+          <h2 className="flex items-center gap-3 text-xl font-semibold"><span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-base text-brand">2</span><span className="sr-only">2. </span>Como trabalhamos</h2>
           {o.howWeWork.text ? <MarkdownText text={o.howWeWork.text} /> : <p className="text-muted">Guia inicial ainda não disponível.</p>}
           {o.howWeWork.history.length > 0 && (
             <div className="mt-2 text-sm text-muted">
@@ -49,8 +49,8 @@ export default async function ComeceAquiPage() {
           )}
         </li>
 
-        <li>
-          <h2 className="text-xl font-semibold">3. De onde vêm as tarefas</h2>
+        <li className="card">
+          <h2 className="flex items-center gap-3 text-xl font-semibold"><span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-base text-brand">3</span><span className="sr-only">3. </span>De onde vêm as tarefas</h2>
           <p className="mt-2 max-w-3xl">
             A lista inicial de atividades veio da aba <strong>{o.activitySource.sheet ?? 'indicada'}</strong> de{' '}
             {o.activitySource.registry ? <SourceLink name={o.activitySource.registry.name} href={o.activitySource.registry.webUrl} /> : 'uma planilha ainda não importada'}
@@ -64,10 +64,10 @@ export default async function ComeceAquiPage() {
           </ol>
         </li>
 
-        <li>
-          <h2 className="text-xl font-semibold">4. Sua primeira ação</h2>
+        <li className="card">
+          <h2 className="flex items-center gap-3 text-xl font-semibold"><span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-base text-brand">4</span><span className="sr-only">4. </span>Sua primeira ação</h2>
           {o.firstAction ? (
-            <div className="mt-2 max-w-3xl rounded border border-line p-4">
+            <div className="mt-3 max-w-3xl rounded-2xl bg-canvas p-4">
               <p className="text-sm text-muted">{o.firstAction.id}</p>
               <p className="text-lg font-semibold"><Link href={`/atividades/${o.firstAction.id}`} className="text-brand underline">{o.firstAction.title}</Link></p>
               <p className="mt-1 flex flex-wrap gap-3"><StatusBadge status={o.firstAction.status} /> <span>Prazo: <DueLabel dueDate={o.firstAction.dueDate} today={today} /></span></p>
@@ -81,7 +81,7 @@ export default async function ComeceAquiPage() {
       </ol>
 
       {o.documents.length > 0 && (
-        <section className="mt-10" aria-labelledby="docs-ref">
+        <section className="card mt-5" aria-labelledby="docs-ref">
           <h2 id="docs-ref" className="text-xl font-semibold">Documentos de referência</h2>
           <ul className="mt-2 space-y-1">
             {o.documents.map((d) => (

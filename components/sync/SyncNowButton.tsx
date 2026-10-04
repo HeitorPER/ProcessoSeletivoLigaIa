@@ -42,7 +42,7 @@ export function SyncNowButton() {
   }
   return (
     <div>
-      <button type="button" onClick={run} disabled={busy} className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">{busy ? 'Sincronizando…' : 'Sincronizar agora'}</button>
+      <button type="button" onClick={run} disabled={busy} className="btn btn-primary">{busy ? 'Sincronizando…' : 'Sincronizar agora'}</button>
       <p role="status" className="mt-1 text-sm">{msg}</p>
     </div>
   );

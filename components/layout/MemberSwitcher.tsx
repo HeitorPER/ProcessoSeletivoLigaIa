@@ -25,7 +25,7 @@ export function MemberSwitcher({ current, members }: { current: MemberInfo; memb
   return (
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="vendo-como" className="text-sm font-medium">Vendo como</label>
-      <select id="vendo-como" value={current.id} onChange={(e) => void change(e.target.value)} className="rounded border border-line bg-white px-2 py-1 text-sm text-ink" aria-describedby={error ? 'vendo-como-erro' : undefined}>
+      <select id="vendo-como" value={current.id} onChange={(e) => void change(e.target.value)} className="field rounded-full py-1 text-sm" aria-describedby={error ? 'vendo-como-erro' : undefined}>
         {members.map((m) => (
           <option key={m.id} value={m.id}>
             {m.displayName} — {m.front}

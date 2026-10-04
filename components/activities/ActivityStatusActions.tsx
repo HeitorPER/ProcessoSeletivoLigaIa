@@ -45,20 +45,20 @@ export function ActivityStatusActions({ id, status }: { id: string; status: Acti
     }
   }
 
-  const btn = 'rounded border px-4 py-2 font-medium disabled:opacity-60';
+  const btn = 'btn';
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {status !== 'done' && <button type="button" disabled={busy} className={`${btn} border-ok text-ok`} onClick={() => patch({ status: 'done' }, 'Atividade marcada como concluída.')}>Marcar como concluída</button>}
-        {status !== 'blocked' && status !== 'done' && <button type="button" disabled={busy} className={`${btn} border-danger text-danger`} aria-expanded={blocking} aria-controls="form-bloqueio" onClick={() => setBlocking((b) => !b)}>Bloquear</button>}
-        {status === 'blocked' && <button type="button" disabled={busy} className={`${btn} border-line`} onClick={() => patch({ status: 'in_progress' }, 'Atividade desbloqueada.')}>Desbloquear (em andamento)</button>}
-        {status === 'done' && <button type="button" disabled={busy} className={`${btn} border-line`} onClick={() => patch({ status: 'in_progress' }, 'Atividade reaberta.')}>Reabrir</button>}
+        {status !== 'done' && <button type="button" disabled={busy} className={`${btn} btn-ok`} onClick={() => patch({ status: 'done' }, 'Atividade marcada como concluída.')}>Marcar como concluída</button>}
+        {status !== 'blocked' && status !== 'done' && <button type="button" disabled={busy} className={`${btn} btn-danger`} aria-expanded={blocking} aria-controls="form-bloqueio" onClick={() => setBlocking((b) => !b)}>Bloquear</button>}
+        {status === 'blocked' && <button type="button" disabled={busy} className={`${btn} btn-secondary`} onClick={() => patch({ status: 'in_progress' }, 'Atividade desbloqueada.')}>Desbloquear (em andamento)</button>}
+        {status === 'done' && <button type="button" disabled={busy} className={`${btn} btn-secondary`} onClick={() => patch({ status: 'in_progress' }, 'Atividade reaberta.')}>Reabrir</button>}
       </div>
       {blocking && (
-        <form id="form-bloqueio" onSubmit={confirmBlock} className="max-w-xl rounded border border-line p-3">
+        <form id="form-bloqueio" onSubmit={confirmBlock} className="max-w-xl rounded-2xl bg-canvas p-4">
           <label htmlFor="motivo-bloqueio" className="font-medium">Motivo do bloqueio (obrigatório)</label>
-          <input ref={reasonRef} id="motivo-bloqueio" required className="mt-1 block w-full rounded border border-line px-3 py-2" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <button type="submit" disabled={busy || !reason.trim()} className="mt-2 rounded bg-danger px-4 py-2 font-semibold text-white disabled:opacity-60">Confirmar bloqueio</button>
+          <input ref={reasonRef} id="motivo-bloqueio" required className="field mt-1 block w-full" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <button type="submit" disabled={busy || !reason.trim()} className="btn btn-danger-solid mt-3">Confirmar bloqueio</button>
         </form>
       )}
       <p role="status" className="text-ok">{success}</p>

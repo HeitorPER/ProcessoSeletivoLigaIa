@@ -25,11 +25,21 @@ export default async function MinhasPage({ searchParams }: { searchParams: Promi
       <PageHeader
         title="Minhas atividades"
         description={`O que ${member.displayName} precisa fazer e até quando — inclui tarefas compartilhadas.`}
-        actions={<Link href="/atividades/nova" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">Nova atividade</Link>}
+        actions={<Link href="/atividades/nova" className="btn btn-primary">Nova atividade</Link>}
       />
-      <p className="mb-4 font-medium">
-        {all.length} aberta{all.length === 1 ? '' : 's'} · {overdue} vencida{overdue === 1 ? '' : 's'} · {blocked} bloqueada{blocked === 1 ? '' : 's'} · {noDue} sem prazo
-      </p>
+      <ul aria-label="Resumo das suas atividades" className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { n: all.length, label: all.length === 1 ? 'aberta' : 'abertas', tone: 'text-ink' },
+          { n: overdue, label: overdue === 1 ? 'vencida' : 'vencidas', tone: overdue ? 'text-danger' : 'text-ink' },
+          { n: blocked, label: blocked === 1 ? 'bloqueada' : 'bloqueadas', tone: blocked ? 'text-danger' : 'text-ink' },
+          { n: noDue, label: 'sem prazo', tone: 'text-ink' },
+        ].map((s) => (
+          <li key={s.label} className="card px-4 py-3 md:px-5 md:py-4">
+            <span className={`block text-2xl font-semibold ${s.tone}`}>{s.n}</span>
+            <span className="text-sm text-muted">{s.label}</span>
+          </li>
+        ))}
+      </ul>
       <ActivityFilters values={values} members={members} basePath="/minhas" showOwner={false} />
       {items.length ? (
         <ActivityList items={items} today={today} />

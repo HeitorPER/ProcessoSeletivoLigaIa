@@ -5,7 +5,7 @@ import { ACTIVITY_STATUSES, FRONTS, STATUS_LABELS, type ActivityPatch, type Memb
 
 type Mode = 'idle' | 'adjust' | 'reject';
 type ReviewBody = { error?: string; code?: string; status?: string; analyzed?: number | null; analysisError?: string };
-const input = 'mt-1 block w-full rounded border border-line bg-white px-3 py-2';
+const input = 'field mt-1 block w-full';
 
 export function ReviewPanel({ id, kind, proposed, members, analysisBlocked = false }: { id: string; kind: SuggestionKind; proposed: ActivityPatch; members: MemberInfo[]; analysisBlocked?: boolean }) {
   const router = useRouter();
@@ -60,22 +60,22 @@ export function ReviewPanel({ id, kind, proposed, members, analysisBlocked = fal
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy || analysisBlocked} aria-describedby={analysisBlocked ? fid('blocked') : undefined} onClick={() => send({ action: 'accept' })} className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+        <button type="button" disabled={busy || analysisBlocked} aria-describedby={analysisBlocked ? fid('blocked') : undefined} onClick={() => send({ action: 'accept' })} className="btn btn-primary">
           {conflict ? 'Analisar linhas como sugestões' : 'Aceitar'}
         </button>
         {!conflict && (
-          <button type="button" disabled={busy} aria-expanded={mode === 'adjust'} aria-controls={fid('adjust')} onClick={() => setMode(mode === 'adjust' ? 'idle' : 'adjust')} className="rounded border border-brand px-4 py-2 font-semibold text-brand disabled:opacity-60">
+          <button type="button" disabled={busy} aria-expanded={mode === 'adjust'} aria-controls={fid('adjust')} onClick={() => setMode(mode === 'adjust' ? 'idle' : 'adjust')} className="btn btn-secondary">
             Ajustar e aceitar
           </button>
         )}
-        <button type="button" disabled={busy} aria-expanded={mode === 'reject'} aria-controls={fid('reject')} onClick={() => setMode(mode === 'reject' ? 'idle' : 'reject')} className="rounded border border-danger px-4 py-2 font-semibold text-danger disabled:opacity-60">
+        <button type="button" disabled={busy} aria-expanded={mode === 'reject'} aria-controls={fid('reject')} onClick={() => setMode(mode === 'reject' ? 'idle' : 'reject')} className="btn btn-danger">
           {conflict ? 'Descartar planilha' : 'Rejeitar'}
         </button>
       </div>
       {analysisBlocked && <p id={fid('blocked')} className="text-sm text-muted">Análise indisponível: a planilha não está mais na pasta. Só o descarte está liberado.</p>}
 
       {mode === 'adjust' && (
-        <form id={fid('adjust')} ref={adjustForm} onSubmit={(e) => { e.preventDefault(); void send({ action: 'adjust', fields }); }} className="grid max-w-2xl gap-3 rounded border border-line p-4">
+        <form id={fid('adjust')} ref={adjustForm} onSubmit={(e) => { e.preventDefault(); void send({ action: 'adjust', fields }); }} className="grid max-w-2xl gap-3 rounded-2xl bg-canvas p-4">
           {keys.includes('title') && <div><label htmlFor={fid('title')} className="font-medium">Título</label><input id={fid('title')} required className={input} value={fields.title ?? ''} onChange={(e) => set('title', e.target.value)} /></div>}
           {keys.includes('nextStep') && <div><label htmlFor={fid('nextStep')} className="font-medium">Próximo passo</label><input id={fid('nextStep')} className={input} value={fields.nextStep ?? ''} onChange={(e) => set('nextStep', e.target.value || null)} /></div>}
           {keys.includes('dueDate') && <div><label htmlFor={fid('dueDate')} className="font-medium">Prazo (vazio = a definir)</label><input id={fid('dueDate')} type="date" className={input} value={fields.dueDate ?? ''} onChange={(e) => set('dueDate', e.target.value || null)} /></div>}
@@ -103,15 +103,15 @@ export function ReviewPanel({ id, kind, proposed, members, analysisBlocked = fal
               </div>
             </fieldset>
           )}
-          <button type="submit" disabled={busy} className="justify-self-start rounded bg-brand px-4 py-2 font-semibold text-white disabled:opacity-60">Salvar ajuste e aceitar</button>
+          <button type="submit" disabled={busy} className="btn btn-primary justify-self-start">Salvar ajuste e aceitar</button>
         </form>
       )}
 
       {mode === 'reject' && (
-        <form id={fid('reject')} ref={rejectForm} onSubmit={(e) => { e.preventDefault(); if (note.trim()) void send({ action: 'reject', note }); }} className="max-w-2xl rounded border border-line p-4">
+        <form id={fid('reject')} ref={rejectForm} onSubmit={(e) => { e.preventDefault(); if (note.trim()) void send({ action: 'reject', note }); }} className="max-w-2xl rounded-2xl bg-canvas p-4">
           <label htmlFor={fid('note')} className="font-medium">Motivo (obrigatório, fica no histórico)</label>
           <textarea id={fid('note')} required rows={2} className={input} value={note} onChange={(e) => setNote(e.target.value)} />
-          <button type="submit" disabled={busy || !note.trim()} className="mt-2 rounded bg-danger px-4 py-2 font-semibold text-white disabled:opacity-60">{conflict ? 'Confirmar descarte' : 'Confirmar rejeição'}</button>
+          <button type="submit" disabled={busy || !note.trim()} className="btn btn-danger-solid mt-3">{conflict ? 'Confirmar descarte' : 'Confirmar rejeição'}</button>
         </form>
       )}
 

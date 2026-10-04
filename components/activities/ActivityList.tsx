@@ -35,23 +35,24 @@ function Source({ a }: { a: ActivityListItem }) {
 export function ActivityList({ items, today }: { items: ActivityListItem[]; today: string }) {
   return (
     <>
-      <table className="hidden w-full border-collapse text-left md:table">
+      <div className="card hidden overflow-x-auto p-0 md:block md:p-0">
+      <table className="w-full border-collapse text-left">
         <caption className="sr-only">Atividades, ordenadas por prazo</caption>
         <thead>
-          <tr className="border-b-2 border-ink text-sm">
-            <th scope="col" className="py-2 pr-3">Atividade</th>
+          <tr className="border-b border-line text-sm text-muted">
+            <th scope="col" className="py-3 pl-6 pr-3">Atividade</th>
             <th scope="col" className="py-2 pr-3">Responsáveis</th>
             <th scope="col" className="py-2 pr-3">Frente</th>
             <th scope="col" className="py-2 pr-3">Estado</th>
             <th scope="col" className="py-2 pr-3">Prazo</th>
             <th scope="col" className="py-2 pr-3">Próximo passo</th>
-            <th scope="col" className="py-2">Fonte</th>
+            <th scope="col" className="py-3 pr-6">Fonte</th>
           </tr>
         </thead>
         <tbody>
           {items.map((a) => (
-            <tr key={a.id} className="border-b border-line align-top">
-              <td className="py-3 pr-3">
+            <tr key={a.id} className="border-b border-hairline align-top last:border-b-0">
+              <td className="py-4 pl-6 pr-3">
                 <Link href={`/atividades/${a.id}`} className="font-semibold text-brand underline-offset-2 hover:underline">{a.title}</Link>
                 <span className="block text-sm text-muted">{a.id}</span>
                 <Flags a={a} />
@@ -61,15 +62,16 @@ export function ActivityList({ items, today }: { items: ActivityListItem[]; toda
               <td className="py-3 pr-3"><StatusBadge status={a.status} /></td>
               <td className="py-3 pr-3"><DueLabel dueDate={a.dueDate} today={today} status={a.status} /></td>
               <td className="py-3 pr-3">{a.nextStep ?? <span className="italic text-muted">a definir</span>}</td>
-              <td className="py-3"><Source a={a} /></td>
+              <td className="py-4 pr-6"><Source a={a} /></td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
 
       <ul className="space-y-3 md:hidden">
         {items.map((a) => (
-          <li key={a.id} className="rounded border border-line p-4">
+          <li key={a.id} className="card">
             <Link href={`/atividades/${a.id}`} className="text-lg font-semibold text-brand underline">{a.title}</Link>
             <p className="text-sm text-muted">{a.id}{a.front ? ` · ${a.front}` : ''}</p>
             <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 [overflow-wrap:anywhere]">

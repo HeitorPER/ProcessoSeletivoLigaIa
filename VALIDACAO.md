@@ -108,7 +108,9 @@ Formato: arquivo — nome do teste.
 | `#7A4B00` / `#FFF4DC` (aviso) | 6,8:1 |
 | `#1E6B3A` / `#E6F4EA` (sucesso) | 5,7:1 |
 
-Todos acima de 4,5:1. Teclado e 375 px dependem de conferência visual (ver roteiro).
+Todos acima de 4,5:1.
+
+**Depois do novo visual (2026-10-04):** a interface ganhou cards arredondados, botões em pílula e os temas claro e escuro. Uma auditoria automática no navegador mediu o contraste de cada texto visível contra o fundo real (incluindo camadas semitransparentes) em 7 páginas, nos dois temas: **nenhum texto abaixo de 4,5:1**. No tema escuro o azul da marca vira `#8EA2FF` (texto) e os botões azuis passam a ter texto escuro. Também conferidos de novo: as 8 páginas cabem em 375 px, o contorno de foco de 3 px acompanha a forma das pílulas e a troca de tema funciona por teclado (`aria-pressed`).
 
 ## Observações da execução local (2026-10-03)
 

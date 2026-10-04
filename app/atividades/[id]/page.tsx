@@ -36,7 +36,7 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
   );
   return (
     <>
-      <PageHeader title={a.title} description={<>{a.id} · <StatusBadge status={a.status} /></>} actions={<Link href={`/atividades/${a.id}/editar`} className="rounded bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">Editar</Link>} />
+      <PageHeader title={a.title} description={<>{a.id} · <StatusBadge status={a.status} /></>} actions={<Link href={`/atividades/${a.id}/editar`} className="btn btn-primary">Editar</Link>} />
       {a.pendingSuggestions > 0 && (
         <Notice tone="info" title="Há atualização proposta pendente">
           Até a revisão, os dados abaixo continuam sendo os oficiais. <Link href="/sugestoes" className="text-brand underline">Ver sugestões</Link>
@@ -50,7 +50,7 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
           <Notice tone="warn" title="Fonte indisponível">Uma fonte desta atividade foi removida ou perdeu acesso. Os dados confirmados abaixo podem estar desatualizados.</Notice>
         ))}
 
-      <dl className="grid max-w-3xl grid-cols-1 gap-x-6 sm:grid-cols-[12rem_1fr]">
+      <dl className="card grid grid-cols-1 gap-x-6 sm:grid-cols-[12rem_minmax(0,1fr)]">
         {row('Responsáveis', a.owners.length ? a.owners.map((o) => o.displayName).join(', ') : <span className="italic text-muted">Responsável a confirmar</span>)}
         {row('Prazo', <DueLabel dueDate={a.dueDate} today={today} status={a.status} />)}
         {row('Próximo passo', a.nextStep ?? <span className="italic text-muted">a definir</span>)}
@@ -64,9 +64,9 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
         {row('Última atualização', formatDateTimeBR(a.updatedAt))}
       </dl>
 
-      <section className="mt-6" aria-labelledby="acoes"><h2 id="acoes" className="mb-2 text-xl font-semibold">Ações</h2><ActivityStatusActions id={a.id} status={a.status} /></section>
+      <section className="card mt-5" aria-labelledby="acoes"><h2 id="acoes" className="mb-2 text-xl font-semibold">Ações</h2><ActivityStatusActions id={a.id} status={a.status} /></section>
 
-      <section className="mt-8" aria-labelledby="fontes">
+      <section className="card mt-5" aria-labelledby="fontes">
         <h2 id="fontes" className="mb-2 text-xl font-semibold">Fontes</h2>
         {a.sources.length ? (
           <ul className="space-y-2">
@@ -81,7 +81,7 @@ export default async function AtividadePage({ params }: { params: Promise<{ id: 
         ) : <p className="text-muted">Criada na Central, sem documento de origem.</p>}
       </section>
 
-      <section className="mt-8" aria-labelledby="historico"><h2 id="historico" className="mb-2 text-xl font-semibold">Histórico de alterações</h2><ActivityTimeline events={a.events} /></section>
+      <section className="card mt-5" aria-labelledby="historico"><h2 id="historico" className="mb-2 text-xl font-semibold">Histórico de alterações</h2><ActivityTimeline events={a.events} /></section>
     </>
   );
 }

@@ -30,16 +30,16 @@ export default async function NovidadesPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Novidades dos documentos" description={`O que mudou para ${member.displayName} ${label}.`} />
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
+      <form method="get" className="mb-5 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="desde" className="text-sm font-medium">Período</label>
-          <select id="desde" name="desde" defaultValue={period} className="mt-1 block rounded border border-line px-2 py-2">
+          <select id="desde" name="desde" defaultValue={period} className="field mt-1 block">
             <option value="visita">Desde minha última visita</option>
             <option value="7d">Últimos 7 dias</option>
             <option value="30d">Últimos 30 dias</option>
           </select>
         </div>
-        <button type="submit" className="rounded border border-brand px-4 py-2 font-semibold text-brand">Atualizar</button>
+        <button type="submit" className="btn btn-secondary">Atualizar</button>
       </form>
 
       {digest.nothingChanged ? (
@@ -53,12 +53,12 @@ export default async function NovidadesPage({ searchParams }: { searchParams: Pr
       <DigestSection id="incerto" title="Incerto ou em conflito" hint="Dados sem evidência suficiente, fontes indisponíveis ou conflitos de fonte." items={digest.uncertain} empty="Nada incerto no momento." />
       <DigestSection id="prazos" title="Prazos próximos e bloqueios" hint="Suas atividades abertas vencidas, com prazo em até 3 dias ou bloqueadas." items={digest.deadlines} empty="Nenhum prazo próximo nem bloqueio." />
 
-      <section aria-labelledby="docs-novos" className="mt-10">
+      <section aria-labelledby="docs-novos" className="card mt-6">
         <h2 id="docs-novos" className="text-xl font-semibold">Documentos novos ou alterados {label}</h2>
         {docs.length === 0 ? <p className="text-muted">Nenhum documento novo ou alterado.</p> : (
-          <ul className="mt-2 space-y-2">
+          <ul className="card-list mt-3">
             {docs.map((d) => (
-              <li key={d.fileId}>
+              <li key={d.fileId} className="py-3">
                 <SourceLink name={d.name} href={d.webUrl} syncStatus={d.syncStatus} /> — {SOURCE_KIND_LABELS[d.kind as SourceKind] ?? d.kind} · {SYNC_STATUS_LABELS[d.syncStatus as SyncStatus] ?? d.syncStatus}
                 {d.lastProcessedAt && <span className="text-sm text-muted"> · {formatDateTimeBR(d.lastProcessedAt)}</span>}
                 {d.statusReason && <span className="block text-sm text-muted">{d.statusReason}</span>}
@@ -66,7 +66,7 @@ export default async function NovidadesPage({ searchParams }: { searchParams: Pr
             ))}
           </ul>
         )}
-        <p className="mt-2 text-sm"><Link href="/sincronizacao" className="text-brand underline">Ver todos os arquivos e o estado da sincronização</Link></p>
+        <p className="mt-3"><Link href="/sincronizacao" className="btn btn-secondary btn-sm whitespace-normal">Ver todos os arquivos e o estado da sincronização</Link></p>
       </section>
     </>
   );
