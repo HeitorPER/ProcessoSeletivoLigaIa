@@ -8,6 +8,7 @@ import { updateActivity } from '@/lib/activities/service';
 import { prisma } from '@/lib/db';
 import { parseXlsx } from '@/lib/extract/xlsx';
 import { analyzeUnauthorizedSheet, ingestExtracted, ingestSource, markSourceUnavailable, restoreExtractedText } from '@/lib/ingest';
+import { LATER_DECISION_REASON } from '@/lib/ingest/minutes';
 import type { FetchedContent, SourceMeta } from '@/lib/types';
 import { resetDb } from './helpers/db';
 
@@ -110,6 +111,43 @@ describe('atas novas e editadas', () => {
     expect(reverting).toHaveLength(0);
     const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'Ata_2026-10-01.md', sourceVersion: 'v2' } });
     expect(discarded.some((d) => d.reason === 'Decisão posterior já aprovada na Central para este campo — a ata não reverte o registro oficial' && d.excerpt.includes('ACT-101'))).toBe(true);
+  });
+  describe('ata corrigindo a própria proposta já aprovada', () => {
+    const ata03 = (version: string, text = ATA03) => ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03', versionOrHash: version }), { format: 'markdown', text }, ctx);
+    const afterMeeting = () =>
+      prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', type: 'suggestion_applied' }, data: { timestamp: new Date('2026-10-04T15:00:00Z') } });
+
+    it('aceita sem ajuste: a correção da mesma ata vira sugestão pendente', async () => {
+      await ata03('v1');
+      const [s] = await pending();
+      expect(await reviewSuggestion(s.id, 'U-B', { action: 'accept' })).toMatchObject({ ok: true, status: 'accepted' });
+      await afterMeeting();
+      await ata03('v2', ATA03.replace('**2026-10-07**', '**2026-10-08**'));
+      expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-08')).toBe(true);
+      const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata03', sourceVersion: 'v2' } });
+      expect(discarded.some((d) => d.reason === LATER_DECISION_REASON)).toBe(false);
+    });
+
+    it('ajustada pelo revisor: continua protegida contra a correção da ata', async () => {
+      await ata03('v1');
+      const [s] = await pending();
+      expect(await reviewSuggestion(s.id, 'U-B', { action: 'adjust', fields: { dueDate: '2026-10-09' } })).toMatchObject({ ok: true, status: 'adjusted' });
+      await afterMeeting();
+      await ata03('v2', ATA03.replace('**2026-10-07**', '**2026-10-08**'));
+      expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-08')).toBe(false);
+      const discarded = await prisma.discardedItem.findMany({ where: { sourceFileId: 'ata03', sourceVersion: 'v2' } });
+      expect(discarded.some((d) => d.reason === LATER_DECISION_REASON && d.excerpt.includes('ACT-101'))).toBe(true);
+    });
+
+    it('edição humana direta depois da aprovação continua protegida', async () => {
+      await ata03('v1');
+      const [s] = await pending();
+      await reviewSuggestion(s.id, 'U-B', { action: 'accept' });
+      await updateActivity('ACT-101', { dueDate: '2026-10-10' }, 'U-A');
+      await prisma.activityEvent.updateMany({ where: { activityId: 'ACT-101', actorId: { not: 'system' } }, data: { timestamp: new Date('2026-10-04T15:00:00Z') } });
+      await ata03('v2', ATA03.replace('**2026-10-07**', '**2026-10-08**'));
+      expect((await pendingFor('ACT-101')).some((p) => JSON.parse(p.proposedFields).dueDate === '2026-10-08')).toBe(false);
+    });
   });
   it('decisão humana anterior à reunião não bloqueia a proposta da ata', async () => {
     await updateActivity('ACT-101', { dueDate: '2026-10-02' }, 'U-A');

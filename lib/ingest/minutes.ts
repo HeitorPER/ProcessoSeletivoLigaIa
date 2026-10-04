@@ -19,15 +19,21 @@ async function registryOrigins(): Promise<Record<string, string>> {
 }
 
 const HUMAN_DECISION_TYPES = ['update', 'status', 'suggestion_applied', 'create'];
+/** Eventos gerados ao aplicar uma sugestão (os demais são edições humanas diretas). */
+const APPLIED_TYPES = ['suggestion_applied', 'create'];
 export const LATER_DECISION_REASON = 'Decisão posterior já aprovada na Central para este campo — a ata não reverte o registro oficial';
 
 /**
  * Spec §3, regra 1: decisão humana aprovada na Central vale mais que a proposta de uma ata.
- * Remove das sugestões de atualização os campos que alguém decidiu na Central depois da reunião
- * (fim do dia da reunião em São Paulo; sem data, depois da última modificação do arquivo).
+ * Remove das sugestões de atualização os campos que alguém decidiu na Central depois do corte
+ * (fim do dia da reunião em São Paulo; sem data, a análise anterior desta ata).
+ * Exceção: aplicar sem ajuste uma sugestão vinda desta mesma ata não protege o campo contra a
+ * correção da própria ata (o revisor aprovou o que a ata dizia, não decidiu outro valor).
+ * Sugestão ajustada pelo revisor e edição humana direta continuam protegidas.
  */
 async function dropRevertsOfLaterDecisions(
   suggestions: ProposedSuggestion[],
+  fileId: string,
   cutoff: Date,
   members: MemberInfo[],
 ): Promise<{ kept: ProposedSuggestion[]; discarded: DiscardedExcerpt[] }> {
@@ -40,9 +46,16 @@ async function dropRevertsOfLaterDecisions(
     }
     const events = await prisma.activityEvent.findMany({
       where: { activityId: s.targetActivityId, actorId: { not: 'system' }, type: { in: HUMAN_DECISION_TYPES }, timestamp: { gt: cutoff } },
-      select: { changedFields: true },
+      select: { changedFields: true, type: true, suggestionId: true },
     });
-    const decided = new Set(events.flatMap((e) => parseJson<string[]>(e.changedFields, [])));
+    const fromThisAta = new Set(
+      (await prisma.suggestion.findMany({
+        where: { id: { in: events.map((e) => e.suggestionId).filter((id): id is string => Boolean(id)) }, sourceFileId: fileId, reviewStatus: 'accepted' },
+        select: { id: true },
+      })).map((x) => x.id),
+    );
+    const protecting = events.filter((e) => !(APPLIED_TYPES.includes(e.type) && e.suggestionId && fromThisAta.has(e.suggestionId)));
+    const decided = new Set(protecting.flatMap((e) => parseJson<string[]>(e.changedFields, [])));
     const fields = { ...s.proposedFields };
     for (const key of Object.keys(fields) as (keyof ActivityFields)[]) {
       if (!decided.has(key)) continue;
@@ -80,7 +93,7 @@ export async function processMinutes(meta: SourceMeta, doc: MarkdownDoc, meeting
   const items = await provider.extract({ documentName: meta.name, meetingDate, text: doc.text, activities, members });
   const result = validateItems(items, { text: doc.text, sections: doc.sections, activities, members });
   const cutoff = meetingDate ? endOfDaySP(meetingDate) : meta.modifiedAt;
-  const { kept, discarded } = await dropRevertsOfLaterDecisions(result.suggestions, cutoff, members);
+  const { kept, discarded } = await dropRevertsOfLaterDecisions(result.suggestions, meta.fileId, cutoff, members);
   // Só substitui as sugestões da versão antiga depois que a nova análise deu certo.
   await supersedePending(meta.fileId, meta.versionOrHash);
   let created = 0;
