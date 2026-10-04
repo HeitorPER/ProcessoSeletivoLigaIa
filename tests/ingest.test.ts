@@ -135,6 +135,7 @@ describe('atas novas e editadas', () => {
     const src = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
     expect(src).toMatchObject({ syncStatus: 'error', processedVersion: null });
     expect(src!.statusReason).toContain('Análise da ata falhou');
+    expect(src!.statusReason).toContain('Nova tentativa na próxima varredura completa (até 10 min).');
     expect((await ingestSource(m, md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx)).status).toBe('processed');
   });
 });
@@ -167,7 +168,7 @@ describe('autoridade e conflitos', () => {
     await ingestSource(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'), ctx);
     await prisma.source.update({ where: { fileId: 'ata03' }, data: { extractedText: null } });
     const before = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
-    const out = await restoreExtractedText(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), md('02_ADICIONAR_DEPOIS_DA_CARGA/Ata_2026-10-03.md'));
+    const out = await restoreExtractedText(metaFor('Ata_2026-10-03', { fileId: 'ata03' }), { format: 'markdown', text: ATA03 });
     expect(out).toMatchObject({ status: 'processed', kind: 'minutes', suggestionsCreated: 0, authorityChanged: false });
     const after = await prisma.source.findUnique({ where: { fileId: 'ata03' } });
     expect(after).toMatchObject({ syncStatus: 'processed', kind: 'minutes', statusReason: before!.statusReason, processedVersion: 'v1' });

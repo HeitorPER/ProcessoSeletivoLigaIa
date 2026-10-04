@@ -220,6 +220,22 @@ describe('ciclo de sincronização', () => {
     expect(src!.statusReason).toContain('próxima varredura completa');
   });
 
+  it('403 por limite de taxa (após as novas tentativas) vira "error" e mantém o cache; 403 de permissão vira "unavailable"', async () => {
+    drive.add({ ...drive.files.get('ESTADO-ATUAL.md')!, md5Checksum: 'md5-estado-editado' });
+    drive.failDownload.set('ESTADO-ATUAL.md', new DriveError('User rate limit exceeded', 403, 'userRateLimitExceeded'));
+    drive.change('ESTADO-ATUAL.md');
+    const r = await runCycle(depsFor(drive), 'incremental');
+    expect(r).toMatchObject({ errors: 1, unavailable: 0 });
+    const src = await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } });
+    expect(src!.syncStatus).toBe('error');
+    expect(src!.extractedText).toBeTruthy();
+
+    drive.failDownload.set('ESTADO-ATUAL.md', new DriveError('The user does not have sufficient permissions for this file.', 403, 'insufficientFilePermissions'));
+    drive.change('ESTADO-ATUAL.md');
+    expect(await runCycle(depsFor(drive), 'incremental')).toMatchObject({ unavailable: 1 });
+    expect(await prisma.source.findUnique({ where: { fileId: 'ESTADO-ATUAL.md' } })).toMatchObject({ syncStatus: 'unavailable', extractedText: null });
+  });
+
   it('arquivo na lixeira (evento com trashed) vira indisponível', async () => {
     drive.add({ ...drive.files.get('GUIA_INICIAL.md')!, trashed: true });
     drive.change('GUIA_INICIAL.md');

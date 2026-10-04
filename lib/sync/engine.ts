@@ -1,6 +1,7 @@
 import type { AIProvider } from '@/lib/ai/types';
 import { prisma } from '@/lib/db';
 import { isInsideTree, walkTree, type DriveFileWithPath } from '@/lib/drive/tree';
+import { isRetryable } from '@/lib/drive/retry';
 import { DriveError, FOLDER_MIME, GSHEET_MIME, XLSX_MIME, type DriveApi } from '@/lib/drive/types';
 import { isIndexFile } from '@/lib/authority/classify';
 import { ingestSource, markSourceUnavailable, mergeSourceMeta, restoreExtractedText, upsertSourceMeta, type IngestOutcome } from '@/lib/ingest';
@@ -74,7 +75,8 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
     content = await fetchContent(deps.api, file);
   } catch (e) {
     await upsertSourceMeta(toSourceMeta(file, existing?.versionOrHash ?? revision));
-    if (e instanceof DriveError && (e.status === 403 || e.status === 404)) {
+    // 403 por limite de taxa (já esgotadas as novas tentativas) é temporário: erro, cache mantido.
+    if (e instanceof DriveError && (e.status === 404 || (e.status === 403 && !isRetryable(e)))) {
       await markSourceUnavailable(file.id, `Sem acesso ao conteúdo do arquivo (HTTP ${e.status})`);
       return 'unavailable';
     }
@@ -89,9 +91,9 @@ async function processFile(deps: SyncDeps, file: DriveFileWithPath, force = fals
     return 'unchanged';
   }
   // Mesmo conteúdo já analisado, só faltando o texto: restaura o cache sem reanalisar (nada de sugestões repetidas).
-  const restorable = existing && existing.processedVersion === hash && content.format !== 'unsupported'
+  const restorable = existing && existing.processedVersion === hash
     && (existing.syncStatus === 'unavailable' || (existing.syncStatus === 'processed' && textMissing));
-  if (!force && restorable) {
+  if (!force && restorable && content.format !== 'unsupported') {
     const reason = existing.syncStatus === 'unavailable' ? 'Arquivo acessível de novo, com o mesmo conteúdo já analisado — texto restaurado sem nova análise' : undefined;
     const restored = await restoreExtractedText(toSourceMeta(file, hash), content, reason);
     if (restored.status !== 'error') await mergeSourceMeta(file.id, { driveRevision: revision });

@@ -104,7 +104,7 @@ export async function ingestExtracted(meta: SourceMeta, doc: ExtractedDoc, ctx: 
       created = await registerSourceConflict(meta, doc as SpreadsheetDoc, c.reason);
     }
   } catch (e) {
-    const msg = `${c.kind === 'minutes' ? 'Análise da ata falhou' : 'Processamento falhou'}: ${(e as Error).message}. Nova tentativa no próximo ciclo.`;
+    const msg = `${c.kind === 'minutes' ? 'Análise da ata falhou' : 'Processamento falhou'}: ${(e as Error).message}. Nova tentativa na próxima varredura completa (até 10 min).`;
     await prisma.source.update({ where: { fileId: meta.fileId }, data: { kind: c.kind, syncStatus: 'error', statusReason: msg, meta: JSON.stringify(metaJson) } });
     return { status: 'error', kind: c.kind, reason: msg, suggestionsCreated: 0, authorityChanged };
   }
